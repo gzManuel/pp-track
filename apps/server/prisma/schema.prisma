@@ -1,0 +1,117 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id           String   @id @default(uuid()) @db.Uuid
+  email        String   @unique
+  displayName  String   @map("display_name")
+  passwordHash String   @map("password_hash")
+  timezone     String   @default("UTC")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  portfolios Portfolio[]
+  watchlist  Watchlist[]
+
+  @@map("users")
+}
+
+model Portfolio {
+  id          String   @id @default(uuid()) @db.Uuid
+  userId      String   @map("user_id") @db.Uuid
+  name        String
+  description String?
+  currency    String   @default("USD")
+  isDefault   Boolean  @default(false) @map("is_default")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  holdings     Holding[]
+  transactions Transaction[]
+
+  @@map("portfolios")
+}
+
+model Asset {
+  id        String   @id @default(uuid()) @db.Uuid
+  ticker    String
+  name      String
+  assetType String   @map("asset_type")
+  exchange  String?
+  currency  String   @default("USD")
+  metadata  Json?
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  holdings       Holding[]
+  transactions   Transaction[]
+  priceSnapshots PriceSnapshot[]
+  watchlist      Watchlist[]
+
+  @@unique([ticker, exchange])
+  @@map("assets")
+}
+
+model Holding {
+  id           String   @id @default(uuid()) @db.Uuid
+  portfolioId  String   @map("portfolio_id") @db.Uuid
+  assetId      String   @map("asset_id") @db.Uuid
+  quantity     Decimal  @db.Decimal(18, 8)
+  avgCostBasis Decimal  @map("avg_cost_basis") @db.Decimal(18, 8)
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  portfolio Portfolio @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
+  asset     Asset     @relation(fields: [assetId], references: [id])
+
+  @@unique([portfolioId, assetId])
+  @@map("holdings")
+}
+
+model Transaction {
+  id          String   @id @default(uuid()) @db.Uuid
+  portfolioId String   @map("portfolio_id") @db.Uuid
+  assetId     String   @map("asset_id") @db.Uuid
+  type        String
+  quantity    Decimal  @db.Decimal(18, 8)
+  price       Decimal  @db.Decimal(18, 8)
+  fee         Decimal  @default(0) @db.Decimal(18, 8)
+  currency    String   @default("USD")
+  transactedAt DateTime @map("transacted_at")
+  notes       String?
+
+  portfolio Portfolio @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
+  asset     Asset     @relation(fields: [assetId], references: [id])
+
+  @@map("transactions")
+}
+
+model PriceSnapshot {
+  id         String   @id @default(uuid()) @db.Uuid
+  assetId    String   @map("asset_id") @db.Uuid
+  price      Decimal  @db.Decimal(18, 8)
+  currency   String   @default("USD")
+  recordedAt DateTime @map("recorded_at")
+
+  asset Asset @relation(fields: [assetId], references: [id])
+
+  @@index([assetId, recordedAt])
+  @@map("price_snapshots")
+}
+
+model Watchlist {
+  id      String   @id @default(uuid()) @db.Uuid
+  userId  String   @map("user_id") @db.Uuid
+  assetId String   @map("asset_id") @db.Uuid
+  addedAt DateTime @default(now()) @map("added_at")
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  asset Asset @relation(fields: [assetId], references: [id])
+
+  @@unique([userId, assetId])
+  @@map("watchlist")
+}
