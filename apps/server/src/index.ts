@@ -1,8 +1,11 @@
 import "dotenv/config";
 import Fastify from "fastify";
-import prisma from "./prisma"
+import prisma from "./prisma.js";
+import { pricesRoutes } from "./routes/prices.js";
 
 const app = Fastify({ logger: true });
+
+app.register(pricesRoutes, { prefix: "/api" });
 
 app.get("/health", async () => {
   try {
