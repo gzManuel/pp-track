@@ -7,6 +7,7 @@
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
+    "migrate": "prisma migrate dev --config=./prisma/prisma.config.ts --schema=./prisma/schema.prisma",
     "lint": "eslint --max-warnings 0",
     "check-types": "tsc --noEmit"
   },

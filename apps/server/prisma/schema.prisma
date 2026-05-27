@@ -7,13 +7,15 @@ datasource db {
 }
 
 model User {
-  id           String   @id @default(uuid()) @db.Uuid
-  email        String   @unique
-  displayName  String   @map("display_name")
-  passwordHash String   @map("password_hash")
-  timezone     String   @default("UTC")
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
+  id            String    @id @default(uuid()) @db.Uuid
+  email         String    @unique
+  name          String
+  passwordHash  String?   @map("password_hash")
+  image         String?
+  emailVerified DateTime? @map("email_verified")
+  timezone      String    @default("UTC")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
 
   portfolios Portfolio[]
   watchlist  Watchlist[]

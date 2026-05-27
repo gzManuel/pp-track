@@ -2,10 +2,12 @@ import "dotenv/config";
 import Fastify from "fastify";
 import prisma from "./prisma.js";
 import { pricesRoutes } from "./routes/prices.js";
+import { usersRoutes } from "./routes/users.js";
 
 const app = Fastify({ logger: true });
 
 app.register(pricesRoutes, { prefix: "/api" });
+app.register(usersRoutes, { prefix: "/api" });
 
 app.get("/health", async () => {
   try {
