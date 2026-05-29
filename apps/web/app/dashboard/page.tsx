@@ -1,0 +1,142 @@
+import { getServerSession } from "next-auth";
+import { redirect } from "next/navigation";
+import { authOptions } from "@/lib/auth";
+import CreatePortfolioDialog from "./create-portfolio-dialog";
+import HoldingsTable from "./holdings-table";
+import LogTransactionDialog from "./log-transaction-dialog";
+import SignOutButton from "./sign-out-button";
+import TransactionsTable from "./transactions-table";
+
+interface RawHolding {
+  id: string;
+  quantity: string;
+  avgCostBasis: string;
+  asset: { ticker: string; name: string; currency: string };
+}
+
+export interface EnrichedHolding {
+  id: string;
+  ticker: string;
+  name: string;
+  currency: string;
+  shares: number;
+  avgCost: number;
+  costBasis: number;
+  currentPrice: number | null;
+  marketValue: number | null;
+  gain: number | null;
+  gainPct: number | null;
+  portfolioPct: number | null;
+}
+
+interface Portfolio {
+  id: string;
+  name: string;
+  isDefault: boolean;
+  currency: string;
+}
+
+interface Transaction {
+  id: string;
+  type: string;
+  quantity: string;
+  price: string;
+  currency: string;
+  fee: string;
+  notes: string | null;
+  transactedAt: string;
+  asset: { ticker: string; name: string };
+}
+
+function serverFetch(url: string, userId: string) {
+  return fetch(url, {
+    headers: {
+      "x-internal-secret": process.env.INTERNAL_API_SECRET!,
+      "x-user-id": userId,
+    },
+    cache: "no-store",
+  });
+}
+
+export default async function DashboardPage() {
+  const session = await getServerSession(authOptions);
+  if (!session) redirect("/");
+
+  const userId = session.user.id;
+  const serverUrl = process.env.SERVER_API_URL ?? "http://localhost:3001";
+
+  const portfoliosRes = await serverFetch(`${serverUrl}/api/portfolios`, userId);
+  const portfolios: Portfolio[] = await portfoliosRes.json();
+
+  const defaultPortfolio = portfolios.find((p) => p.isDefault) ?? portfolios[0];
+
+  if (!defaultPortfolio) {
+    return (
+      <main className="flex min-h-screen items-center justify-center p-8">
+        <div className="flex flex-col items-center gap-3 text-center">
+          <h1 className="text-xl font-semibold">No portfolio yet</h1>
+          <p className="text-sm text-muted-foreground">
+            Create one to start tracking your investments.
+          </p>
+          <CreatePortfolioDialog />
+          <SignOutButton />
+        </div>
+      </main>
+    );
+  }
+
+  const [holdingsRes, txRes] = await Promise.all([
+    serverFetch(`${serverUrl}/api/portfolios/${defaultPortfolio.id}/holdings`, userId),
+    serverFetch(`${serverUrl}/api/portfolios/${defaultPortfolio.id}/transactions`, userId),
+  ]);
+  const rawHoldings: RawHolding[] = await holdingsRes.json();
+  const transactions: Transaction[] = await txRes.json();
+
+  // Fetch current prices for all tickers in one request
+  const tickers = rawHoldings.map((h) => h.asset.ticker).join(",");
+  const priceMap: Record<string, number> = {};
+  if (tickers) {
+    const pricesRes = await fetch(`${serverUrl}/api/prices?tickers=${encodeURIComponent(tickers)}`, { cache: "no-store" });
+    const prices: { ticker: string; price?: string; error?: string }[] = await pricesRes.json();
+    for (const p of prices) {
+      if (p.price) priceMap[p.ticker] = Number(p.price);
+    }
+  }
+
+  // Compute derived columns
+  const enrichedHoldings: EnrichedHolding[] = rawHoldings.map((h) => {
+    const shares = Number(h.quantity);
+    const avgCost = Number(h.avgCostBasis);
+    const costBasis = shares * avgCost;
+    const currentPrice = priceMap[h.asset.ticker] ?? null;
+    const marketValue = currentPrice !== null ? shares * currentPrice : null;
+    const gain = marketValue !== null ? marketValue - costBasis : null;
+    const gainPct = gain !== null ? (gain / costBasis) * 100 : null;
+    return { id: h.id, ticker: h.asset.ticker, name: h.asset.name, currency: h.asset.currency, shares, avgCost, costBasis, currentPrice, marketValue, gain, gainPct, portfolioPct: null };
+  });
+
+  const totalMarketValue = enrichedHoldings.reduce((sum, h) => sum + (h.marketValue ?? 0), 0);
+  for (const h of enrichedHoldings) {
+    h.portfolioPct = totalMarketValue > 0 && h.marketValue !== null ? (h.marketValue / totalMarketValue) * 100 : null;
+  }
+
+  return (
+    <main className="mx-auto p-8">
+      <div className="mb-6 flex items-center justify-between">
+        <h1 className="text-2xl font-semibold">{defaultPortfolio.name}</h1>
+        <div className="flex items-center gap-2">
+          <LogTransactionDialog portfolioId={defaultPortfolio.id} />
+          <SignOutButton />
+        </div>
+      </div>
+      <section className="mb-10">
+        <h2 className="mb-3 text-lg font-medium">Positions</h2>
+        <HoldingsTable holdings={enrichedHoldings} />
+      </section>
+      <section>
+        <h2 className="mb-3 text-lg font-medium">Transactions</h2>
+        <TransactionsTable transactions={transactions} />
+      </section>
+    </main>
+  );
+}
