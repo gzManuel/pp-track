@@ -8,7 +8,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
+} from "@/components/shadcn/Table";
 import type { EnrichedHolding } from "./page";
 
 function fmt(value: number, decimals = 2) {

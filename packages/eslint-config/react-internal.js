@@ -1,10 +1,18 @@
 import js from "@eslint/js";
+import { FlatCompat } from "@eslint/eslintrc";
 import eslintConfigPrettier from "eslint-config-prettier";
 import tseslint from "typescript-eslint";
 import pluginReactHooks from "eslint-plugin-react-hooks";
 import pluginReact from "eslint-plugin-react";
 import globals from "globals";
+import { fileURLToPath } from "url";
+import path from "path";
 import { config as baseConfig } from "./base.js";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const compat = new FlatCompat({ baseDirectory: __dirname });
 
 /**
  * A custom ESLint configuration for libraries that use React.
@@ -13,8 +21,9 @@ import { config as baseConfig } from "./base.js";
 export const config = [
   ...baseConfig,
   js.configs.recommended,
-  eslintConfigPrettier,
   ...tseslint.configs.recommended,
+  ...compat.extends("airbnb"),
+  eslintConfigPrettier,
   pluginReact.configs.flat.recommended,
   {
     languageOptions: {
@@ -32,8 +41,12 @@ export const config = [
     settings: { react: { version: "detect" } },
     rules: {
       ...pluginReactHooks.configs.recommended.rules,
-      // React scope no longer necessary with new JSX transform.
       "react/react-in-jsx-scope": "off",
+      // TypeScript provides prop type safety; prop-types are redundant
+      "react/prop-types": "off",
+      "react/require-default-props": "off",
+      // Allow JSX in .tsx files
+      "react/jsx-filename-extension": ["warn", { extensions: [".tsx", ".jsx"] }],
     },
   },
 ];

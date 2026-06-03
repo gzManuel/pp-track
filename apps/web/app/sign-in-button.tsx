@@ -1,7 +1,7 @@
 "use client";
 
 import { signIn } from "next-auth/react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/shadcn/Button";
 
 export default function SignInButton() {
   return (

@@ -6,6 +6,7 @@ import HoldingsTable from "./holdings-table";
 import LogTransactionDialog from "./log-transaction-dialog";
 import SignOutButton from "./sign-out-button";
 import TransactionsTable from "./transactions-table";
+import RefreshButton from "./refresh-button";
 
 interface RawHolding {
   id: string;
@@ -125,6 +126,7 @@ export default async function DashboardPage() {
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-2xl font-semibold">{defaultPortfolio.name}</h1>
         <div className="flex items-center gap-2">
+          <RefreshButton />
           <LogTransactionDialog portfolioId={defaultPortfolio.id} />
           <SignOutButton />
         </div>

@@ -5,7 +5,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
+} from "@/components/shadcn/Table";
 
 const TICKERS = ["AAPL", "AAPLD.BA", "SPYDD.BA"];
 
