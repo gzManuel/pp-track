@@ -1,6 +1,7 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import CreatePortfolioDialog from "./_components/CreatePortfolioDialog";
+import CurrencyToggle from "./_components/CurrencyToggle";
 import HoldingsTable from "./_components/HoldingsTable";
 import LogTransactionForm from "./_components/LogTransactionForm";
 import RefreshButton from "./_components/RefreshButton";
@@ -44,10 +45,17 @@ function serverFetch(url: string, userId: string) {
   });
 }
 
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ currency?: string }>;
+}) {
   const session = await getServerSession(authOptions);
   const userId = session!.user.id;
   const serverUrl = process.env.SERVER_API_URL ?? "http://localhost:3001";
+
+  const { currency } = await searchParams;
+  const ars = currency?.toUpperCase() === "ARS";
 
   const portfoliosRes = await serverFetch(`${serverUrl}/api/portfolios`, userId);
   const portfolios: Portfolio[] = await portfoliosRes.json();
@@ -75,7 +83,7 @@ export default async function DashboardPage() {
   const priceMap: Record<string, number> = {};
   if (tickers) {
     const pricesRes = await fetch(
-      `${serverUrl}/api/prices?tickers=${encodeURIComponent(tickers)}`,
+      `${serverUrl}/api/prices?tickers=${encodeURIComponent(tickers)}${ars ? "&currency=ARS" : ""}`,
       { cache: "no-store" }
     );
     const prices: { ticker: string; price?: string }[] = await pricesRes.json();
@@ -125,11 +133,14 @@ export default async function DashboardPage() {
     <>
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-2xl font-semibold">{defaultPortfolio.name}</h1>
-        <RefreshButton />
+        <div className="flex items-center gap-2">
+          <CurrencyToggle />
+          <RefreshButton />
+        </div>
       </div>
       <section className="mb-10">
         <h2 className="mb-3 text-lg font-medium">Positions</h2>
-        <HoldingsTable holdings={enrichedHoldings} />
+        <HoldingsTable holdings={enrichedHoldings} priceCurrency={ars ? "ARS" : "USD"} />
       </section>
       <section className="max-w-2xl">
         <h2 className="mb-3 text-lg font-medium">Log transaction</h2>

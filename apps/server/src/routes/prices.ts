@@ -1,23 +1,26 @@
 import type { FastifyPluginAsync } from "fastify";
 import prisma from "../prisma.js";
-import { fetchQuote } from "../services/yahoo-finance.js";
+import { fetchQuote, toArsTicker } from "../services/yahoo-finance.js";
 
 const CACHE_TTL_MS = 15 * 60 * 1000;
 
 export const pricesRoutes: FastifyPluginAsync = async (app) => {
-  app.get<{ Querystring: { tickers?: string } }>("/prices", async (request, reply) => {
-    const { tickers } = request.query;
+  app.get<{ Querystring: { tickers?: string; currency?: string } }>("/prices", async (request, reply) => {
+    const { tickers, currency } = request.query;
 
     if (!tickers) {
       return reply.status(400).send({ error: "tickers query param is required" });
     }
+
+    // CEDEARs are tracked in USD; request `?currency=ARS` to fetch the D-stripped ticker.
+    const ars = currency?.toUpperCase() === "ARS";
 
     const symbols = tickers
       .split(",")
       .map((t) => t.trim())
       .filter(Boolean);
 
-    const settled = await Promise.allSettled(symbols.map((s) => getPriceWithCache(s)));
+    const settled = await Promise.allSettled(symbols.map((s) => getPriceWithCache(s, ars)));
     const results = settled.map((result, i) =>
       result.status === "fulfilled"
         ? result.value
@@ -27,11 +30,14 @@ export const pricesRoutes: FastifyPluginAsync = async (app) => {
   });
 };
 
-async function getPriceWithCache(symbol: string) {
+async function getPriceWithCache(symbol: string, ars: boolean) {
+  // Fetch/cache under the actually-quoted ticker (e.g. SPY.BA for ARS), but
+  // always respond keyed by the requested ticker so callers can match results.
+  const fetchSymbol = ars ? toArsTicker(symbol) : symbol;
   const cutoff = new Date(Date.now() - CACHE_TTL_MS);
 
   const asset = await prisma.asset.findFirst({
-    where: { ticker: symbol },
+    where: { ticker: fetchSymbol },
     include: {
       priceSnapshots: {
         where: { recordedAt: { gte: cutoff } },
@@ -52,13 +58,13 @@ async function getPriceWithCache(symbol: string) {
     };
   }
 
-  const quote = await fetchQuote(symbol);
+  const quote = await fetchQuote(fetchSymbol);
 
   let assetId: string;
   if (!asset) {
     const created = await prisma.asset.create({
       data: {
-        ticker: symbol,
+        ticker: fetchSymbol,
         name: quote.name,
         assetType: quote.quoteType,
         exchange: quote.exchange,

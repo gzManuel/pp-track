@@ -30,7 +30,13 @@ function GainCell({ value, pct }: { value: number | null; pct?: number | null })
   );
 }
 
-export default function HoldingsTable({ holdings }: { holdings: EnrichedHolding[] }) {
+export default function HoldingsTable({
+  holdings,
+  priceCurrency = "USD",
+}: {
+  holdings: EnrichedHolding[];
+  priceCurrency?: string;
+}) {
   if (holdings.length === 0) {
     return (
       <p className="py-12 text-center text-sm text-muted-foreground">
@@ -54,8 +60,8 @@ export default function HoldingsTable({ holdings }: { holdings: EnrichedHolding[
           <TableHead>Name</TableHead>
           <TableHead className="text-right">Shares</TableHead>
           <TableHead className="text-right">Avg Cost</TableHead>
-          <TableHead className="text-right">Current Price</TableHead>
-          <TableHead className="text-right">Market Value</TableHead>
+          <TableHead className="text-right">Current Price ({priceCurrency})</TableHead>
+          <TableHead className="text-right">Market Value ({priceCurrency})</TableHead>
           <TableHead className="text-right">Gain / Loss</TableHead>
           <TableHead className="text-right">Portfolio %</TableHead>
         </TableRow>
