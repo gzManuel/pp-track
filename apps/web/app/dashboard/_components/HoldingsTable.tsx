@@ -9,7 +9,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/shadcn/Table";
-import type { EnrichedHolding } from "./page";
+import type { EnrichedHolding } from "../page";
 
 function fmt(value: number, decimals = 2) {
   return value.toLocaleString("en-US", { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
