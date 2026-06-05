@@ -1,12 +1,12 @@
 import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import { authOptions } from "@/lib/auth";
-import CreatePortfolioDialog from "./create-portfolio-dialog";
-import HoldingsTable from "./holdings-table";
-import LogTransactionDialog from "./log-transaction-dialog";
-import SignOutButton from "./sign-out-button";
-import TransactionsTable from "./transactions-table";
-import RefreshButton from "./refresh-button";
+import CreatePortfolioDialog from "./_components/CreatePortfolioDialog";
+import HoldingsTable from "./_components/HoldingsTable";
+import LogTransactionDialog from "./_components/LogTransactionDialog";
+import SignOutButton from "./_components/SignOutButton";
+import TransactionsTable from "./_components/TransactionsTable";
+import RefreshButton from "./_components/RefreshButton";
 
 interface RawHolding {
   id: string;

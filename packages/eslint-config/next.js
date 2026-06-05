@@ -65,6 +65,9 @@ export const nextJsConfig = [
       "react/require-default-props": "off",
       // Allow JSX in .tsx files
       "react/jsx-filename-extension": ["warn", { extensions: [".tsx", ".jsx"] }],
+      // airbnb re-enables these; TypeScript handles both
+      "import/extensions": "off",
+      "import/no-unresolved": "off",
     },
   },
 ];

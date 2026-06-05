@@ -45,6 +45,8 @@ export const config = [
     rules: {
       // TypeScript-ESM projects use .js extensions for .ts files; let TS handle resolution
       "import/extensions": "off",
+      // TypeScript already validates all imports including path aliases like @/
+      "import/no-unresolved": "off",
       // typescript-eslint's version is more accurate for TS
       "no-unused-vars": "off",
     },
