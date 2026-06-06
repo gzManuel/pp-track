@@ -4,7 +4,7 @@ import { fetchQuote, toArsTicker } from "../services/yahoo-finance.js";
 
 const CACHE_TTL_MS = 15 * 60 * 1000;
 
-export const pricesRoutes: FastifyPluginAsync = async (app) => {
+const pricesRoutes: FastifyPluginAsync = async (app) => {
   app.get<{ Querystring: { tickers?: string; currency?: string } }>("/prices", async (request, reply) => {
     const { tickers, currency } = request.query;
 
@@ -29,6 +29,8 @@ export const pricesRoutes: FastifyPluginAsync = async (app) => {
     return results;
   });
 };
+
+export default pricesRoutes;
 
 async function getPriceWithCache(symbol: string, ars: boolean) {
   // Fetch/cache under the actually-quoted ticker (e.g. SPY.BA for ARS), but

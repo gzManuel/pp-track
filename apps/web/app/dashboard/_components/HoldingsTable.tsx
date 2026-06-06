@@ -71,7 +71,7 @@ export default function HoldingsTable({
           <TableRow key={h.id}>
             <TableCell className="font-mono font-medium">{h.ticker}</TableCell>
             <TableCell className="text-sm text-muted-foreground">{h.name}</TableCell>
-            <TableCell className="text-right font-mono">{fmt(h.shares, 4)}</TableCell>
+            <TableCell className="text-right font-mono">{fmt(h.shares, 0)}</TableCell>
             <TableCell className="text-right font-mono">{fmt(h.avgCost, 4)}</TableCell>
             <TableCell className="text-right font-mono">
               {h.currentPrice !== null ? fmt(h.currentPrice) : <span className="text-muted-foreground">—</span>}

@@ -122,6 +122,7 @@ export default async function DashboardPage({
     (sum, h) => sum + (h.marketValue ?? 0),
     0
   );
+  
   enrichedHoldings.forEach((h) => {
     h.portfolioPct =
       totalMarketValue > 0 && h.marketValue !== null

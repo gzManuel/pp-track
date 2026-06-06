@@ -53,7 +53,7 @@ export default function LogTransactionForm({
       quantity: undefined,
       price: undefined,
       currency: "USD",
-      transactedAt: new Date().toISOString().substring(0, 10),
+      transactedAt: new Date().toLocaleDateString("en-CA"),
       fee: undefined,
       notes: "",
     },
@@ -87,7 +87,7 @@ export default function LogTransactionForm({
                 <FormLabel>Ticker</FormLabel>
                 <FormControl>
                   <Input
-                    placeholder="e.g. AAPL, AAPLD.BA"
+                    placeholder="e.g. AAPL, SPY.BA"
                     {...field}
                     onChange={(e) =>
                       field.onChange(e.target.value.toUpperCase())

@@ -6,9 +6,9 @@ import {
 } from "fastify-type-provider-zod";
 import prismaPlugin from "./plugins/prisma.js";
 import authPlugin from "./plugins/auth.js";
-import { pricesRoutes } from "./routes/prices.js";
-import { usersRoutes } from "./routes/users.js";
-import { portfoliosRoutes } from "./routes/portfolios.js";
+import pricesRoutes from "./routes/prices.js";
+import usersRoutes from "./routes/users.js";
+import portfoliosRoutes from "./routes/portfolios.js";
 
 const app = Fastify({ logger: true });
 

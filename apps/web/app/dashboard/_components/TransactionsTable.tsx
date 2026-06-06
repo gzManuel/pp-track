@@ -9,6 +9,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/shadcn/Table";
+import DeleteTransactionButton from "./DeleteTransactionButton";
 
 interface Transaction {
   id: string;
@@ -24,8 +25,10 @@ interface Transaction {
 
 export default function TransactionsTable({
   transactions,
+  portfolioId,
 }: {
   transactions: Transaction[];
+  portfolioId: string;
 }) {
   if (transactions.length === 0) {
     return (
@@ -46,6 +49,7 @@ export default function TransactionsTable({
           <TableHead className="text-right">Price</TableHead>
           <TableHead>Currency</TableHead>
           <TableHead className="text-right">Fee</TableHead>
+          <TableHead className="w-12" />
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -71,6 +75,13 @@ export default function TransactionsTable({
             <TableCell>{tx.currency}</TableCell>
             <TableCell className="text-right font-mono text-muted-foreground">
               {Number(tx.fee) > 0 ? Number(tx.fee).toFixed(2) : "—"}
+            </TableCell>
+            <TableCell className="text-right">
+              <DeleteTransactionButton
+                portfolioId={portfolioId}
+                txId={tx.id}
+                label={`${tx.type} ${Number(tx.quantity).toFixed(4)} ${tx.asset.ticker}`}
+              />
             </TableCell>
           </TableRow>
         ))}

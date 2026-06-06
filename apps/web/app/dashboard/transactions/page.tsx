@@ -64,7 +64,7 @@ export default async function TransactionsPage() {
       </section>
       <section>
         <h2 className="mb-3 text-lg font-medium">History</h2>
-        <TransactionsTable transactions={transactions} />
+        <TransactionsTable transactions={transactions} portfolioId={defaultPortfolio.id} />
       </section>
     </>
   );

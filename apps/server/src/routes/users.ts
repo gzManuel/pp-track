@@ -1,7 +1,7 @@
 import type { FastifyPluginAsync } from "fastify";
 import prisma from "../prisma.js";
 
-export const usersRoutes: FastifyPluginAsync = async (app) => {
+const usersRoutes: FastifyPluginAsync = async (app) => {
   app.post<{
     Body: { email: string; name?: string; image?: string };
   }>("/users/upsert", async (request, reply) => {
@@ -29,3 +29,5 @@ export const usersRoutes: FastifyPluginAsync = async (app) => {
     return user;
   });
 };
+
+export default usersRoutes;

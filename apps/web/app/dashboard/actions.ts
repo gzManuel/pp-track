@@ -52,3 +52,22 @@ export async function logTransaction(
   if (!res.ok) throw new Error("Failed to log transaction");
   return res.json();
 }
+
+export async function deleteTransaction(portfolioId: string, txId: string) {
+  const session = await getServerSession(authOptions);
+  if (!session) throw new Error("Unauthorized");
+
+  const res = await fetch(
+    `${serverUrl}/api/portfolios/${portfolioId}/transactions/${txId}`,
+    {
+      method: "DELETE",
+      // No JSON body on delete — omit Content-Type so Fastify doesn't reject an empty body.
+      headers: {
+        "x-internal-secret": process.env.INTERNAL_API_SECRET!,
+        "x-user-id": session.user.id,
+      },
+    }
+  );
+
+  if (!res.ok) throw new Error("Failed to delete transaction");
+}
