@@ -85,6 +85,7 @@ model Transaction {
   currency    String   @default("USD")
   transactedAt DateTime @map("transacted_at")
   notes       String?
+  createdAt   DateTime @default(now()) @map("created_at")
 
   portfolio Portfolio @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
   asset     Asset     @relation(fields: [assetId], references: [id])

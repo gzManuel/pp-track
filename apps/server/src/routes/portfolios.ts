@@ -2,7 +2,8 @@ import type { FastifyPluginAsync } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
-import { fetchQuote, getMepRate, toUsdTicker } from "../services/yahoo-finance.js";
+import { fetchQuote, toUsdTicker } from "../services/yahoo-finance.js";
+import getMepRate from "../services/mep.js";
 
 // #1 — Schemas drive both runtime validation and the inferred TS types.
 const portfolioParams = z.object({ id: z.uuid() });
@@ -99,7 +100,7 @@ const portfoliosRoutes: FastifyPluginAsync = async (fastify) => {
       return app.prisma.transaction.findMany({
         where: { portfolioId: request.params.id },
         include: { asset: { select: { ticker: true, name: true } } },
-        orderBy: { transactedAt: "desc" },
+        orderBy: [{ transactedAt: "desc" }, { createdAt: "desc" }],
       });
     }
   );
@@ -126,7 +127,7 @@ const portfoliosRoutes: FastifyPluginAsync = async (fastify) => {
       // the dólar MEP implied by the pair at the trade date.
       const usdTicker = toUsdTicker(ticker);
       if (currency.toUpperCase() === "ARS" && usdTicker !== ticker) {
-        const mep = await getMepRate(ticker, transactedAt);
+        const mep = await getMepRate(transactedAt);
         price = price / mep;
         if (fee) fee = fee / mep;
         ticker = usdTicker;
@@ -205,8 +206,8 @@ const portfoliosRoutes: FastifyPluginAsync = async (fastify) => {
 
       // Delete and rebuild the affected holding atomically.
       await app.prisma.$transaction(async (tx) => {
-        await recomputeHolding(tx, request.params.id, transaction.assetId);
         await tx.transaction.delete({ where: { id: transaction.id } });
+        await recomputeHolding(tx, request.params.id, transaction.assetId);
       });
 
       return reply.status(204).send();
@@ -285,7 +286,9 @@ async function recomputeHolding(
 ) {
   const transactions = await tx.transaction.findMany({
     where: { portfolioId, assetId, type: { in: ["BUY", "SELL"] } },
-    orderBy: { transactedAt: "asc" },
+    // createdAt breaks ties between same-day trades (all anchored at 20:00 UTC),
+    // so the replay matches the order positions were actually built in.
+    orderBy: [{ transactedAt: "asc" }, { createdAt: "asc" }],
   });
 
   const { quantity, avgCostBasis } = transactions.reduce(
