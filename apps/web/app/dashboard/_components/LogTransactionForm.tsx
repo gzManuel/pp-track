@@ -40,8 +40,10 @@ type FormValues = z.infer<typeof schema>;
 
 export default function LogTransactionForm({
   portfolioId,
+  onSuccess,
 }: {
   portfolioId: string;
+  onSuccess?: () => void;
 }) {
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
@@ -70,6 +72,7 @@ export default function LogTransactionForm({
       });
       form.reset();
       router.refresh();
+      onSuccess?.();
     });
   }
 

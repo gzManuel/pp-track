@@ -3,7 +3,7 @@ import { authOptions } from "@/lib/auth";
 import CreatePortfolioDialog from "./_components/CreatePortfolioDialog";
 import CurrencyToggle from "./_components/CurrencyToggle";
 import HoldingsTable from "./_components/HoldingsTable";
-import LogTransactionForm from "./_components/LogTransactionForm";
+import LogTransactionDialog from "./_components/LogTransactionDialog";
 import RefreshButton from "./_components/RefreshButton";
 
 interface RawHolding {
@@ -137,15 +137,12 @@ export default async function DashboardPage({
         <div className="flex items-center gap-2">
           <CurrencyToggle />
           <RefreshButton />
+          <LogTransactionDialog portfolioId={defaultPortfolio.id} />
         </div>
       </div>
       <section className="mb-10">
         <h2 className="mb-3 text-lg font-medium">Positions</h2>
         <HoldingsTable holdings={enrichedHoldings} priceCurrency={ars ? "ARS" : "USD"} />
-      </section>
-      <section className="max-w-2xl">
-        <h2 className="mb-3 text-lg font-medium">Log transaction</h2>
-        <LogTransactionForm portfolioId={defaultPortfolio.id} />
       </section>
     </>
   );
