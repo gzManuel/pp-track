@@ -283,67 +283,88 @@ async function updateHolding(
   });
 }
 
-// Rebuilds a holding from scratch by replaying its remaining BUY/SELL transactions
-// in chronological order. Used after a delete, since an average-cost update can't be
-// reversed in place (the average loses the per-lot history needed to undo it).
+// Quantities below the stored Decimal(18,8) precision are float noise, not a real
+// position — treat anything smaller as zero so a rebuild can't leave a dead holding alive.
+const QTY_EPSILON = 1e-8;
+
+// Replays BUY/SELL transactions in (quantity, value) space, where `value` is the total
+// cost basis (avgCostBasis * quantity). A BUY adds price*qty + fee; a SELL removes shares
+// at the running average (value drops proportionally, so the average is unchanged).
+function replayPosition(
+  transactions: { type: string; quantity: Prisma.Decimal; price: Prisma.Decimal; fee: Prisma.Decimal }[]
+): { quantity: number; value: number } {
+  return transactions.reduce(
+    (pos, t) => {
+      const qty = Number(t.quantity);
+      if (t.type === "BUY") {
+        return { quantity: pos.quantity + qty, value: pos.value + qty * Number(t.price) + Number(t.fee) };
+      }
+      const avg = pos.quantity > 0 ? pos.value / pos.quantity : 0;
+      const sold = Math.min(qty, pos.quantity);
+      return { quantity: Math.max(0, pos.quantity - qty), value: Math.max(0, pos.value - sold * avg) };
+    },
+    { quantity: 0, value: 0 }
+  );
+}
+
+// Rebuilds a holding after a transaction is deleted. A holding's quantity is the sum of an
+// optional imported base (from scripts/import-portfolio.ts, with no backing transactions)
+// and everything its BUY/SELL transactions added. We recover that base as the residual
+// `holding − replay(all transactions)`, then rebuild as `base + replay(remaining)`. So a
+// purely transaction-built holding (base ≈ 0) is removed once its last transaction is gone,
+// while an imported base survives. Replaying — rather than reversing in place — is required
+// because an average-cost update loses the per-lot history needed to undo it.
 async function recomputeHolding(
   tx: Prisma.TransactionClient,
   portfolioId: string,
   assetId: string,
   transactionId: string
 ) {
+  // All BUY/SELL for this position, including the one about to be deleted (it's removed
+  // from the DB after this runs). createdAt breaks ties between same-day trades (all
+  // anchored at 20:00 UTC), so the replay matches the order the position was built in.
   const transactions = await tx.transaction.findMany({
     where: { portfolioId, assetId, type: { in: ["BUY", "SELL"] } },
-    // createdAt breaks ties between same-day trades (all anchored at 20:00 UTC),
-    // so the replay matches the order positions were actually built in.
     orderBy: [{ transactedAt: "asc" }, { createdAt: "asc" }],
   });
 
-  const { quantity: transactionQuantity, avgCostBasis: transactionAvgCostBasis } = transactions.reduce(
-    (pos, t) => {
-
-      const qty = Number(t.quantity);
-
-      if (t.type === "BUY") {
-        const newQty = pos.quantity + qty;
-        return {
-          quantity: newQty,
-          avgCostBasis:
-            (pos.quantity * pos.avgCostBasis + qty * Number(t.price) + Number(t.fee)) / newQty,
-        };
-      }
-
-      return { quantity: Math.max(0, pos.quantity - qty), avgCostBasis: pos.avgCostBasis };
-    },
-    { quantity: 0, avgCostBasis: 0 }
-  );
   const existing = await tx.holding.findUnique({
     where: { portfolioId_assetId: { portfolioId, assetId } },
   });
 
-  const holdingQuantity = Number(existing?.quantity ?? 0)
-  const holdingAvgCostBasis = Number(existing?.avgCostBasis ?? 0)
-  const newQuantity = holdingQuantity - transactionQuantity
+  const all = replayPosition(transactions);
+  const remaining = replayPosition(transactions.filter((t) => t.id !== transactionId));
 
-  if (newQuantity <= 0) {
-    if (existing) {
-      await tx.holding.delete({ where: { id: existing.id } });
-    }
+  // The portion of the current holding not explained by its transactions (an imported base,
+  // or ~0 for a transaction-built holding). Drop sub-precision residue so it can't survive.
+  const holdingQty = Number(existing?.quantity ?? 0);
+  const holdingValue = holdingQty * Number(existing?.avgCostBasis ?? 0);
+  let baseQty = holdingQty - all.quantity;
+  let baseValue = holdingValue - all.value;
+  if (Math.abs(baseQty) < QTY_EPSILON) {
+    baseQty = 0;
+    baseValue = 0;
+  }
+
+  const newQty = baseQty + remaining.quantity;
+
+  // Nothing left once the base and remaining transactions are combined: drop the row.
+  if (newQty < QTY_EPSILON) {
+    if (existing) await tx.holding.delete({ where: { id: existing.id } });
     return;
   }
 
-  const newAvgCostBasis = (holdingAvgCostBasis * holdingQuantity - transactionQuantity * transactionAvgCostBasis) / newQuantity
+  const newValue = baseValue + remaining.value;
+  const avgCostBasis = newValue / newQty;
 
   if (existing) {
     await tx.holding.update({
       where: { id: existing.id },
-      data: {
-        quantity: newQuantity, avgCostBasis: newAvgCostBasis
-      },
+      data: { quantity: newQty, avgCostBasis },
     });
   } else {
     await tx.holding.create({
-      data: { portfolioId, assetId, quantity: newQuantity, avgCostBasis: newAvgCostBasis },
+      data: { portfolioId, assetId, quantity: newQty, avgCostBasis },
     });
   }
 }
