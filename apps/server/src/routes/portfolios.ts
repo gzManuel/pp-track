@@ -79,7 +79,14 @@ const portfoliosRoutes: FastifyPluginAsync = async (fastify) => {
       return app.prisma.holding.findMany({
         where: { portfolioId: request.params.id },
         include: {
-          asset: { select: { ticker: true, name: true, currency: true } },
+          asset: {
+            select: {
+              ticker: true,
+              name: true,
+              currency: true,
+              assetType: true,
+            },
+          },
         },
         orderBy: { createdAt: "asc" },
       });
@@ -206,7 +213,7 @@ const portfoliosRoutes: FastifyPluginAsync = async (fastify) => {
 
       // Delete and rebuild the affected holding atomically.
       await app.prisma.$transaction(async (tx) => {
-        await recomputeHolding(tx, request.params.id, transaction.assetId);
+        await recomputeHolding(tx, request.params.id, transaction.assetId, transaction.id);
         await tx.transaction.delete({ where: { id: transaction.id } });
       });
 
@@ -282,7 +289,8 @@ async function updateHolding(
 async function recomputeHolding(
   tx: Prisma.TransactionClient,
   portfolioId: string,
-  assetId: string
+  assetId: string,
+  transactionId: string
 ) {
   const transactions = await tx.transaction.findMany({
     where: { portfolioId, assetId, type: { in: ["BUY", "SELL"] } },
@@ -293,6 +301,7 @@ async function recomputeHolding(
 
   const { quantity: transactionQuantity, avgCostBasis: transactionAvgCostBasis } = transactions.reduce(
     (pos, t) => {
+
       const qty = Number(t.quantity);
 
       if (t.type === "BUY") {

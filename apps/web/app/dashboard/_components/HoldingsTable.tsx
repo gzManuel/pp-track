@@ -15,6 +15,15 @@ function fmt(value: number, decimals = 2) {
   return value.toLocaleString("en-US", { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
 }
 
+// Shares: whole numbers for stocks/ETFs, but crypto positions are fractional
+// (e.g. 0.05 BTC), so show up to 8 decimals and trim trailing zeros.
+function fmtShares(value: number) {
+  return value.toLocaleString("en-US", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 8,
+  });
+}
+
 function GainCell({ value, pct }: { value: number | null; pct?: number | null }) {
   if (value === null) return <TableCell className="text-right font-mono text-muted-foreground">—</TableCell>;
   const positive = value >= 0;
@@ -71,7 +80,7 @@ export default function HoldingsTable({
           <TableRow key={h.id}>
             <TableCell className="font-mono font-medium">{h.ticker}</TableCell>
             <TableCell className="text-sm text-muted-foreground">{h.name}</TableCell>
-            <TableCell className="text-right font-mono">{fmt(h.shares, 0)}</TableCell>
+            <TableCell className="text-right font-mono">{fmtShares(h.shares)}</TableCell>
             <TableCell className="text-right font-mono">{fmt(h.avgCost, 4)}</TableCell>
             <TableCell className="text-right font-mono">
               {h.currentPrice !== null ? fmt(h.currentPrice) : <span className="text-muted-foreground">—</span>}

@@ -38,10 +38,12 @@ export interface SymbolSearchResult {
 }
 
 /**
- * Free-text symbol search backing the ticker autocomplete. Only Yahoo-listed
- * equities and ETFs are returned (this app tracks stocks and CEDEARs); crypto,
+ * Free-text symbol search backing the ticker autocomplete. Returns Yahoo-listed
+ * equities, ETFs and cryptocurrencies (stocks, CEDEARs and crypto are tracked);
  * futures, indices, currencies and non-Yahoo entities are dropped.
  */
+const SEARCHABLE_TYPES = new Set(["EQUITY", "ETF", "CRYPTOCURRENCY"]);
+
 export async function searchSymbols(query: string): Promise<SymbolSearchResult[]> {
   // `validateResult: false` skips yahoo-finance2's bundled JSON-schema check,
   // which rejects otherwise-valid ETF/equity quotes when Yahoo's response shape
@@ -54,7 +56,8 @@ export async function searchSymbols(query: string): Promise<SymbolSearchResult[]
     .filter(
       (q) =>
         q.isYahooFinance === true &&
-        (q.quoteType === "EQUITY" || q.quoteType === "ETF")
+        typeof q.quoteType === "string" &&
+        SEARCHABLE_TYPES.has(q.quoteType)
     )
     .map((q) => ({
       symbol: String(q.symbol),

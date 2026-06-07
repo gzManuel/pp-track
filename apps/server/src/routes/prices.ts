@@ -1,6 +1,7 @@
 import type { FastifyPluginAsync } from "fastify";
 import prisma from "../prisma.js";
 import { fetchQuote, toArsTicker } from "../services/yahoo-finance.js";
+import getMepRate from "../services/mep.js";
 
 const CACHE_TTL_MS = 15 * 60 * 1000;
 
@@ -35,6 +36,8 @@ export default pricesRoutes;
 async function getPriceWithCache(symbol: string, ars: boolean) {
   // Fetch/cache under the actually-quoted ticker (e.g. SPY.BA for ARS), but
   // always respond keyed by the requested ticker so callers can match results.
+  // CEDEARs encode ARS as a distinct .BA ticker; crypto keeps its single USD
+  // ticker and is converted to ARS via the MEP rate below.
   const fetchSymbol = ars ? toArsTicker(symbol) : symbol;
   const cutoff = new Date(Date.now() - CACHE_TTL_MS);
 
@@ -49,53 +52,77 @@ async function getPriceWithCache(symbol: string, ars: boolean) {
     },
   });
 
+  let result: {
+    ticker: string;
+    price: string;
+    currency: string;
+    recordedAt: Date;
+    cached: boolean;
+  };
+  let assetType: string;
+
   if (asset?.priceSnapshots[0]) {
     const snapshot = asset.priceSnapshots[0];
-    return {
+    assetType = asset.assetType;
+    result = {
       ticker: symbol,
       price: snapshot.price.toString(),
       currency: snapshot.currency,
       recordedAt: snapshot.recordedAt,
       cached: true,
     };
-  }
+  } else {
+    const quote = await fetchQuote(fetchSymbol);
+    assetType = quote.quoteType;
 
-  const quote = await fetchQuote(fetchSymbol);
+    let assetId: string;
+    if (!asset) {
+      const created = await prisma.asset.create({
+        data: {
+          ticker: fetchSymbol,
+          name: quote.name,
+          assetType: quote.quoteType,
+          exchange: quote.exchange,
+          currency: quote.currency,
+        },
+      });
+      assetId = created.id;
+    } else {
+      await prisma.asset.update({
+        where: { id: asset.id },
+        data: { name: quote.name },
+      });
+      assetId = asset.id;
+    }
 
-  let assetId: string;
-  if (!asset) {
-    const created = await prisma.asset.create({
+    const snapshot = await prisma.priceSnapshot.create({
       data: {
-        ticker: fetchSymbol,
-        name: quote.name,
-        assetType: quote.quoteType,
-        exchange: quote.exchange,
+        assetId,
+        price: quote.price,
         currency: quote.currency,
+        recordedAt: new Date(),
       },
     });
-    assetId = created.id;
-  } else {
-    await prisma.asset.update({
-      where: { id: asset.id },
-      data: { name: quote.name },
-    });
-    assetId = asset.id;
+
+    result = {
+      ticker: symbol,
+      price: snapshot.price.toString(),
+      currency: snapshot.currency,
+      recordedAt: snapshot.recordedAt,
+      cached: false,
+    };
   }
 
-  const snapshot = await prisma.priceSnapshot.create({
-    data: {
-      assetId,
-      price: quote.price,
-      currency: quote.currency,
-      recordedAt: new Date(),
-    },
-  });
+  // Crypto is stored once in USD; convert to ARS on the fly with the MEP rate
+  // when requested. (CEDEARs already came back in ARS via their .BA ticker.)
+  if (ars && assetType === "CRYPTOCURRENCY" && result.currency === "USD") {
+    const rate = await getMepRate(new Date());
+    return {
+      ...result,
+      price: (Number(result.price) * rate).toString(),
+      currency: "ARS",
+    };
+  }
 
-  return {
-    ticker: symbol,
-    price: snapshot.price.toString(),
-    currency: snapshot.currency,
-    recordedAt: snapshot.recordedAt,
-    cached: false,
-  };
+  return result;
 }

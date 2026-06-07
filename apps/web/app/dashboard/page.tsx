@@ -12,7 +12,7 @@ interface RawHolding {
   id: string;
   quantity: string;
   avgCostBasis: string;
-  asset: { ticker: string; name: string; currency: string };
+  asset: { ticker: string; name: string; currency: string; assetType: string };
 }
 
 export interface EnrichedHolding {
@@ -20,6 +20,7 @@ export interface EnrichedHolding {
   ticker: string;
   name: string;
   currency: string;
+  assetType: string;
   shares: number;
   avgCost: number;
   costBasis: number;
@@ -109,6 +110,7 @@ export default async function DashboardPage({
       ticker: h.asset.ticker,
       name: h.asset.name,
       currency: h.asset.currency,
+      assetType: h.asset.assetType,
       shares,
       avgCost,
       costBasis,
