@@ -9,6 +9,7 @@ import authPlugin from "./plugins/auth.js";
 import pricesRoutes from "./routes/prices.js";
 import usersRoutes from "./routes/users.js";
 import portfoliosRoutes from "./routes/portfolios.js";
+import assetsRoutes from "./routes/assets.js";
 
 const app = Fastify({ logger: true });
 
@@ -23,6 +24,7 @@ await app.register(authPlugin);
 app.register(pricesRoutes, { prefix: "/api" });
 app.register(usersRoutes, { prefix: "/api" });
 app.register(portfoliosRoutes, { prefix: "/api" });
+app.register(assetsRoutes, { prefix: "/api" });
 
 app.get("/health", async () => {
   try {

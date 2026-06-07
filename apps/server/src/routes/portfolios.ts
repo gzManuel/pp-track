@@ -206,8 +206,8 @@ const portfoliosRoutes: FastifyPluginAsync = async (fastify) => {
 
       // Delete and rebuild the affected holding atomically.
       await app.prisma.$transaction(async (tx) => {
-        await tx.transaction.delete({ where: { id: transaction.id } });
         await recomputeHolding(tx, request.params.id, transaction.assetId);
+        await tx.transaction.delete({ where: { id: transaction.id } });
       });
 
       return reply.status(204).send();
@@ -291,7 +291,7 @@ async function recomputeHolding(
     orderBy: [{ transactedAt: "asc" }, { createdAt: "asc" }],
   });
 
-  const { quantity, avgCostBasis } = transactions.reduce(
+  const { quantity: transactionQuantity, avgCostBasis: transactionAvgCostBasis } = transactions.reduce(
     (pos, t) => {
       const qty = Number(t.quantity);
 
@@ -303,29 +303,38 @@ async function recomputeHolding(
             (pos.quantity * pos.avgCostBasis + qty * Number(t.price) + Number(t.fee)) / newQty,
         };
       }
-      
+
       return { quantity: Math.max(0, pos.quantity - qty), avgCostBasis: pos.avgCostBasis };
     },
     { quantity: 0, avgCostBasis: 0 }
   );
-
   const existing = await tx.holding.findUnique({
     where: { portfolioId_assetId: { portfolioId, assetId } },
   });
 
-  if (quantity <= 0) {
-    if (existing) await tx.holding.delete({ where: { id: existing.id } });
+  const holdingQuantity = Number(existing?.quantity ?? 0)
+  const holdingAvgCostBasis = Number(existing?.avgCostBasis ?? 0)
+  const newQuantity = holdingQuantity - transactionQuantity
+
+  if (newQuantity <= 0) {
+    if (existing) {
+      await tx.holding.delete({ where: { id: existing.id } });
+    }
     return;
   }
+
+  const newAvgCostBasis = (holdingAvgCostBasis * holdingQuantity - transactionQuantity * transactionAvgCostBasis) / newQuantity
 
   if (existing) {
     await tx.holding.update({
       where: { id: existing.id },
-      data: { quantity, avgCostBasis },
+      data: {
+        quantity: newQuantity, avgCostBasis: newAvgCostBasis
+      },
     });
   } else {
     await tx.holding.create({
-      data: { portfolioId, assetId, quantity, avgCostBasis },
+      data: { portfolioId, assetId, quantity: newQuantity, avgCostBasis: newAvgCostBasis },
     });
   }
 }

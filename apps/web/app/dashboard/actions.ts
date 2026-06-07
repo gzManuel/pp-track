@@ -13,6 +13,32 @@ function authHeaders(userId: string) {
   };
 }
 
+export type TickerSearchResult = {
+  symbol: string;
+  name: string;
+  exchange: string | null;
+  type: string;
+  source: "portfolio" | "yahoo";
+};
+
+export async function searchTickers(
+  query: string
+): Promise<TickerSearchResult[]> {
+  const q = query.trim();
+  if (!q) return [];
+
+  const session = await getServerSession(authOptions);
+  if (!session) throw new Error("Unauthorized");
+
+  const res = await fetch(
+    `${serverUrl}/api/assets/search?q=${encodeURIComponent(q)}`,
+    { headers: authHeaders(session.user.id) }
+  );
+
+  if (!res.ok) throw new Error("Failed to search tickers");
+  return res.json();
+}
+
 export async function createPortfolio(name: string) {
   const session = await getServerSession(authOptions);
   if (!session) throw new Error("Unauthorized");

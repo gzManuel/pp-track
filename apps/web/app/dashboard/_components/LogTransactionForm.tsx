@@ -23,6 +23,7 @@ import {
   SelectValue,
 } from "@/components/shadcn/Select";
 import { logTransaction } from "../actions";
+import TickerCombobox from "./TickerCombobox";
 
 const schema = z.object({
   ticker: z.string().min(1, "Required"),
@@ -83,15 +84,12 @@ export default function LogTransactionForm({
             control={form.control}
             name="ticker"
             render={({ field }) => (
-              <FormItem>
+              <FormItem className="flex flex-col">
                 <FormLabel>Ticker</FormLabel>
                 <FormControl>
-                  <Input
-                    placeholder="e.g. AAPL, SPY.BA"
-                    {...field}
-                    onChange={(e) =>
-                      field.onChange(e.target.value.toUpperCase())
-                    }
+                  <TickerCombobox
+                    value={field.value}
+                    onChange={field.onChange}
                   />
                 </FormControl>
                 <FormMessage />

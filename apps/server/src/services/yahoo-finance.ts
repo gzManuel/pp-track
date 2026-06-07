@@ -30,6 +30,40 @@ export function toUsdTicker(ticker: string): string {
   return ticker.replace(/\.BA$/i, "D.BA");
 }
 
+export interface SymbolSearchResult {
+  symbol: string;
+  name: string;
+  exchange: string | null;
+  type: string;
+}
+
+/**
+ * Free-text symbol search backing the ticker autocomplete. Only Yahoo-listed
+ * equities and ETFs are returned (this app tracks stocks and CEDEARs); crypto,
+ * futures, indices, currencies and non-Yahoo entities are dropped.
+ */
+export async function searchSymbols(query: string): Promise<SymbolSearchResult[]> {
+  // `validateResult: false` skips yahoo-finance2's bundled JSON-schema check,
+  // which rejects otherwise-valid ETF/equity quotes when Yahoo's response shape
+  // drifts ahead of the installed library version.
+  const result = (await yf.search(query, { newsCount: 0 }, { validateResult: false })) as {
+    quotes?: Array<Record<string, unknown>>;
+  };
+
+  return (result.quotes ?? [])
+    .filter(
+      (q) =>
+        q.isYahooFinance === true &&
+        (q.quoteType === "EQUITY" || q.quoteType === "ETF")
+    )
+    .map((q) => ({
+      symbol: String(q.symbol),
+      name: String(q.longname ?? q.shortname ?? q.symbol),
+      exchange: q.exchange != null ? String(q.exchange) : null,
+      type: String(q.quoteType),
+    }));
+}
+
 export async function fetchQuote(symbol: string): Promise<QuoteResult> {
   const quote = await yf.quote(symbol);
 
