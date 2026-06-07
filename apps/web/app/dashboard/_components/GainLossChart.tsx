@@ -1,14 +1,6 @@
 "use client";
 
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Cell,
-  ReferenceLine,
-  XAxis,
-  YAxis,
-} from "recharts";
+import { Bar, BarChart, CartesianGrid, Cell, XAxis, YAxis } from "recharts";
 import {
   Card,
   CardContent,
@@ -24,8 +16,22 @@ import {
 import type { EnrichedHolding } from "../page";
 import { tickerColorMap } from "./chartColors";
 
+const GAIN_COLOR = "#059669"; // emerald-600
+const LOSS_COLOR = "#ef4444"; // red-500
+
+interface ChartDatum {
+  ticker: string;
+  base: number;
+  delta: number;
+  cost: number;
+  gain: number;
+  gainPct: number | null;
+  isGain: boolean;
+}
+
 const chartConfig = {
-  gain: { label: "Gain / Loss" },
+  base: { label: "Cost" },
+  delta: { label: "Gain / Loss" },
 } satisfies ChartConfig;
 
 function fmt(value: number, decimals = 2) {
@@ -43,18 +49,28 @@ export default function GainLossChart({
   priceCurrency: string;
 }) {
   const colors = tickerColorMap(holdings.map((h) => h.ticker));
-  const data = holdings
-    .filter((h) => h.gain !== null)
-    .map((h) => ({
-      ticker: h.ticker,
-      gain: h.gain as number,
-      gainPct: h.gainPct,
-    }));
+  const data: ChartDatum[] = holdings
+    .filter((h) => h.gain !== null && h.marketValue !== null)
+    .map((h) => {
+      const gain = h.gain as number;
+      // Stack the cost foundation and the gain/loss cap so both render as
+      // positive segments: for a gain the green cap sits above cost, for a
+      // loss the red cap sits above market value (capping back up to cost).
+      return {
+        ticker: h.ticker,
+        base: Math.min(h.costBasis, h.marketValue as number),
+        delta: Math.abs(gain),
+        cost: h.costBasis,
+        gain,
+        gainPct: h.gainPct,
+        isGain: gain >= 0,
+      };
+    });
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Gain / Loss ({priceCurrency})</CardTitle>
+        <CardTitle>Cost &amp; Gain / Loss ({priceCurrency})</CardTitle>
       </CardHeader>
       <CardContent>
         {data.length === 0 ? (
@@ -75,25 +91,36 @@ export default function GainLossChart({
                 tickMargin={8}
               />
               <YAxis tickLine={false} axisLine={false} width={56} />
-              <ReferenceLine y={0} stroke="var(--border)" />
               <ChartTooltip
                 content={
                   <ChartTooltipContent
-                    formatter={(value, _name, item) => {
-                      const v = Number(value);
-                      const sign = v >= 0 ? "+" : "";
-                      return `${sign}${fmt(v)} ${priceCurrency}${
-                        item?.payload?.gainPct != null
-                          ? ` (${sign}${fmt(item.payload.gainPct, 1)}%)`
-                          : ""
-                      }`;
+                    formatter={(_value, name, item) => {
+                      const d = item?.payload as ChartDatum | undefined;
+                      if (!d) return null;
+                      if (name === "base") {
+                        return `Cost: ${fmt(d.cost)} ${priceCurrency}`;
+                      }
+                      const sign = d.gain >= 0 ? "+" : "";
+                      const pct =
+                        d.gainPct != null
+                          ? ` (${sign}${fmt(d.gainPct, 1)}%)`
+                          : "";
+                      return `Gain / Loss: ${sign}${fmt(d.gain)} ${priceCurrency}${pct}`;
                     }}
                   />
                 }
               />
-              <Bar dataKey="gain" radius={4}>
+              <Bar dataKey="base" stackId="a" radius={[0, 0, 4, 4]}>
                 {data.map((d) => (
                   <Cell key={d.ticker} fill={colors[d.ticker]} />
+                ))}
+              </Bar>
+              <Bar dataKey="delta" stackId="a" radius={[4, 4, 0, 0]}>
+                {data.map((d) => (
+                  <Cell
+                    key={d.ticker}
+                    fill={d.isGain ? GAIN_COLOR : LOSS_COLOR}
+                  />
                 ))}
               </Bar>
             </BarChart>
