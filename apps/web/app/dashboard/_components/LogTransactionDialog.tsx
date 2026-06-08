@@ -13,9 +13,11 @@ import {
 import LogTransactionForm from "./LogTransactionForm";
 
 export default function LogTransactionDialog({
-  portfolioId,
+  portfolios,
+  defaultPortfolioId,
 }: {
-  portfolioId: string;
+  portfolios: { id: string; name: string }[];
+  defaultPortfolioId: string;
 }) {
   const [open, setOpen] = useState(false);
 
@@ -32,7 +34,8 @@ export default function LogTransactionDialog({
           <DialogTitle>Log transaction</DialogTitle>
         </DialogHeader>
         <LogTransactionForm
-          portfolioId={portfolioId}
+          portfolios={portfolios}
+          defaultPortfolioId={defaultPortfolioId}
           onSuccess={() => setOpen(false)}
         />
       </DialogContent>

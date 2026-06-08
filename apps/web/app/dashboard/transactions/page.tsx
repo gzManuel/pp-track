@@ -60,7 +60,10 @@ export default async function TransactionsPage() {
       <h1 className="mb-6 text-2xl font-semibold">Transactions</h1>
       <section className="mb-10 max-w-2xl">
         <h2 className="mb-3 text-lg font-medium">Log transaction</h2>
-        <LogTransactionForm portfolioId={defaultPortfolio.id} />
+        <LogTransactionForm
+          portfolios={portfolios}
+          defaultPortfolioId={defaultPortfolio.id}
+        />
       </section>
       <section>
         <h2 className="mb-3 text-lg font-medium">History</h2>

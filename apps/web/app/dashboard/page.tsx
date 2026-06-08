@@ -141,7 +141,10 @@ export default async function DashboardPage({
         <div className="flex items-center gap-2">
           <CurrencyToggle />
           <RefreshButton />
-          <LogTransactionDialog portfolioId={defaultPortfolio.id} />
+          <LogTransactionDialog
+            portfolios={portfolios}
+            defaultPortfolioId={defaultPortfolio.id}
+          />
         </div>
       </div>
       <section className="mb-10 grid gap-4 md:grid-cols-2">

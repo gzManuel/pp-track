@@ -26,6 +26,7 @@ import { logTransaction } from "../actions";
 import TickerCombobox from "./TickerCombobox";
 
 const schema = z.object({
+  portfolioId: z.string().min(1, "Required"),
   ticker: z.string().min(1, "Required"),
   type: z.enum(["BUY", "SELL"]),
   quantity: z.string().min(1, "Required").refine((v) => Number(v) > 0, "Must be positive"),
@@ -39,10 +40,12 @@ const schema = z.object({
 type FormValues = z.infer<typeof schema>;
 
 export default function LogTransactionForm({
-  portfolioId,
+  portfolios,
+  defaultPortfolioId,
   onSuccess,
 }: {
-  portfolioId: string;
+  portfolios: { id: string; name: string }[];
+  defaultPortfolioId: string;
   onSuccess?: () => void;
 }) {
   const [isPending, startTransition] = useTransition();
@@ -51,6 +54,7 @@ export default function LogTransactionForm({
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
+      portfolioId: defaultPortfolioId,
       ticker: "",
       type: "BUY",
       quantity: undefined,
@@ -64,8 +68,9 @@ export default function LogTransactionForm({
 
   function onSubmit(values: FormValues) {
     startTransition(async () => {
+      const { portfolioId, ...data } = values;
       await logTransaction(portfolioId, {
-        ...values,
+        ...data,
         quantity: Number(values.quantity),
         price: Number(values.price),
         fee: values.fee ? Number(values.fee) : undefined,
@@ -82,6 +87,31 @@ export default function LogTransactionForm({
         onSubmit={form.handleSubmit(onSubmit)}
         className="flex flex-col gap-4"
       >
+        <FormField
+          control={form.control}
+          name="portfolioId"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Portfolio</FormLabel>
+              <Select onValueChange={field.onChange} defaultValue={field.value}>
+                <FormControl>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  {portfolios.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
         <div className="grid grid-cols-2 gap-4">
           <FormField
             control={form.control}
