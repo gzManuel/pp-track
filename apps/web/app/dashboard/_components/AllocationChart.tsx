@@ -25,6 +25,43 @@ function fmt(value: number, decimals = 2) {
   });
 }
 
+const RADIAN = Math.PI / 180;
+
+// Draw each slice's allocation percentage centered in the donut band, so the split is
+// readable without hovering. recharts passes the slice geometry and its datum payload.
+function renderSliceLabel({
+  cx,
+  cy,
+  midAngle,
+  innerRadius,
+  outerRadius,
+  payload,
+}: {
+  cx: number;
+  cy: number;
+  midAngle: number;
+  innerRadius: number;
+  outerRadius: number;
+  payload: { pct: number | null };
+}) {
+  if (payload.pct == null) return null;
+  const radius = innerRadius + (outerRadius - innerRadius) / 2;
+  const x = cx + radius * Math.cos(-midAngle * RADIAN);
+  const y = cy + radius * Math.sin(-midAngle * RADIAN);
+  return (
+    <text
+      x={x}
+      y={y}
+      fill="#fff"
+      textAnchor="middle"
+      dominantBaseline="central"
+      className="text-xs font-medium"
+    >
+      {fmt(payload.pct, payload.pct < 10 ? 1 : 0)}%
+    </text>
+  );
+}
+
 export default function AllocationChart({
   holdings,
   priceCurrency,
@@ -60,7 +97,7 @@ export default function AllocationChart({
         ) : (
           <ChartContainer
             config={chartConfig}
-            className="mx-auto aspect-square max-h-[280px]"
+            className="mx-auto aspect-square max-h-[350px]"
           >
             <PieChart>
               <ChartTooltip
@@ -82,8 +119,10 @@ export default function AllocationChart({
                 data={data}
                 dataKey="value"
                 nameKey="ticker"
-                innerRadius={60}
+                innerRadius={75}
                 strokeWidth={2}
+                labelLine={false}
+                label={renderSliceLabel}
               >
                 {data.map((d) => (
                   <Cell key={d.ticker} fill={d.fill} />
