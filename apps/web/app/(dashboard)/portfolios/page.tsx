@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import CreatePortfolioDialog from "../_components/CreatePortfolioDialog";
@@ -112,9 +113,10 @@ export default async function PortfoliosPage() {
             const summary = summaries[i]!;
             const positive = summary.gain >= 0;
             return (
-              <div
+              <Link
                 key={p.id}
-                className="rounded-lg border p-5 flex flex-col gap-3"
+                href={`/dashboard?portfolio=${p.id}`}
+                className="rounded-lg border p-5 flex flex-col gap-3 transition-colors hover:bg-muted/50 hover:border-foreground/20"
               >
                 <div className="flex flex-col gap-1">
                   <div className="flex items-center justify-between">
@@ -155,7 +157,7 @@ export default async function PortfoliosPage() {
                     </dd>
                   </div>
                 </dl>
-              </div>
+              </Link>
             );
           })}
         </div>
