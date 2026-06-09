@@ -15,7 +15,7 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from "@/components/shadcn/Chart";
-import type { EnrichedHolding } from "../page";
+import type { EnrichedHolding } from "../dashboard/page";
 import { tickerColorMap } from "./chartColors";
 
 function fmt(value: number, decimals = 2) {

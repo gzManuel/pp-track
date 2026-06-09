@@ -13,7 +13,7 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from "@/components/shadcn/Chart";
-import type { EnrichedHolding } from "../page";
+import type { EnrichedHolding } from "../dashboard/page";
 import { tickerColorMap } from "./chartColors";
 
 const GAIN_COLOR = "#059669"; // emerald-600

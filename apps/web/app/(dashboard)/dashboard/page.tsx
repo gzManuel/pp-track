@@ -1,12 +1,12 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import AllocationChart from "./_components/AllocationChart";
-import CreatePortfolioDialog from "./_components/CreatePortfolioDialog";
-import CurrencyToggle from "./_components/CurrencyToggle";
-import GainLossChart from "./_components/GainLossChart";
-import HoldingsTable from "./_components/HoldingsTable";
-import LogTransactionDialog from "./_components/LogTransactionDialog";
-import RefreshButton from "./_components/RefreshButton";
+import AllocationChart from "../_components/AllocationChart";
+import CreatePortfolioDialog from "../_components/CreatePortfolioDialog";
+import CurrencyToggle from "../_components/CurrencyToggle";
+import GainLossChart from "../_components/GainLossChart";
+import HoldingsTable from "../_components/HoldingsTable";
+import LogTransactionDialog from "../_components/LogTransactionDialog";
+import RefreshButton from "../_components/RefreshButton";
 
 interface RawHolding {
   id: string;
