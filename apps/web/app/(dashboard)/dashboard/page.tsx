@@ -6,6 +6,7 @@ import CurrencyToggle from "../_components/CurrencyToggle";
 import GainLossChart from "../_components/GainLossChart";
 import HoldingsTable from "../_components/HoldingsTable";
 import LogTransactionDialog from "../_components/LogTransactionDialog";
+import PortfolioSwitcher from "../_components/PortfolioSwitcher";
 import RefreshButton from "../_components/RefreshButton";
 
 interface RawHolding {
@@ -51,20 +52,23 @@ function serverFetch(url: string, userId: string) {
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ currency?: string }>;
+  searchParams: Promise<{ currency?: string; portfolio?: string }>;
 }) {
   const session = await getServerSession(authOptions);
   const userId = session!.user.id;
   const serverUrl = process.env.SERVER_API_URL ?? "http://localhost:3001";
 
-  const { currency } = await searchParams;
+  const { currency, portfolio } = await searchParams;
   const ars = currency?.toUpperCase() === "ARS";
 
   const portfoliosRes = await serverFetch(`${serverUrl}/api/portfolios`, userId);
   const portfolios: Portfolio[] = await portfoliosRes.json();
-  const defaultPortfolio = portfolios.find((p) => p.isDefault) ?? portfolios[0];
+  const selectedPortfolio =
+    (portfolio && portfolios.find((p) => p.id === portfolio)) ||
+    portfolios.find((p) => p.isDefault) ||
+    portfolios[0];
 
-  if (!defaultPortfolio) {
+  if (!selectedPortfolio) {
     return (
       <div className="flex flex-col items-center gap-3 py-20 text-center">
         <h1 className="text-xl font-semibold">No portfolio yet</h1>
@@ -77,7 +81,7 @@ export default async function DashboardPage({
   }
 
   const holdingsRes = await serverFetch(
-    `${serverUrl}/api/portfolios/${defaultPortfolio.id}/holdings`,
+    `${serverUrl}/api/portfolios/${selectedPortfolio.id}/holdings`,
     userId
   );
   const rawHoldings: RawHolding[] = await holdingsRes.json();
@@ -137,13 +141,16 @@ export default async function DashboardPage({
   return (
     <>
       <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">{defaultPortfolio.name}</h1>
+        <PortfolioSwitcher
+          portfolios={portfolios}
+          activeId={selectedPortfolio.id}
+        />
         <div className="flex items-center gap-2">
           <CurrencyToggle />
           <RefreshButton />
           <LogTransactionDialog
             portfolios={portfolios}
-            defaultPortfolioId={defaultPortfolio.id}
+            defaultPortfolioId={selectedPortfolio.id}
           />
         </div>
       </div>
