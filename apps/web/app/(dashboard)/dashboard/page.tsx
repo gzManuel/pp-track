@@ -63,6 +63,8 @@ export default async function DashboardPage({
 
   const portfoliosRes = await serverFetch(`${serverUrl}/api/portfolios`, userId);
   const portfolios: Portfolio[] = await portfoliosRes.json();
+
+  const showAll = portfolio === "all";
   const selectedPortfolio =
     (portfolio && portfolios.find((p) => p.id === portfolio)) ||
     portfolios.find((p) => p.isDefault) ||
@@ -80,13 +82,54 @@ export default async function DashboardPage({
     );
   }
 
-  const holdingsRes = await serverFetch(
-    `${serverUrl}/api/portfolios/${selectedPortfolio.id}/holdings`,
-    userId
+  // "All Portfolios" aggregates every portfolio's positions; otherwise just the
+  // selected one. Same asset across portfolios is merged into one row below.
+  const loadedPortfolios = showAll ? portfolios : [selectedPortfolio];
+  const holdingsLists: RawHolding[][] = await Promise.all(
+    loadedPortfolios.map((p) =>
+      serverFetch(`${serverUrl}/api/portfolios/${p.id}/holdings`, userId).then(
+        (r) => r.json()
+      )
+    )
   );
-  const rawHoldings: RawHolding[] = await holdingsRes.json();
+  const rawHoldings: RawHolding[] = holdingsLists.flat();
 
-  const tickers = rawHoldings.map((h) => h.asset.ticker).join(",");
+  // Merge positions by ticker so the same asset held in several portfolios
+  // collapses into a single row with summed shares and blended cost basis.
+  const byTicker = new Map<
+    string,
+    {
+      id: string;
+      ticker: string;
+      name: string;
+      currency: string;
+      assetType: string;
+      shares: number;
+      costBasis: number;
+    }
+  >();
+  for (const h of rawHoldings) {
+    const shares = Number(h.quantity);
+    const costBasis = shares * Number(h.avgCostBasis);
+    const existing = byTicker.get(h.asset.ticker);
+    if (existing) {
+      existing.shares += shares;
+      existing.costBasis += costBasis;
+    } else {
+      byTicker.set(h.asset.ticker, {
+        id: h.id,
+        ticker: h.asset.ticker,
+        name: h.asset.name,
+        currency: h.asset.currency,
+        assetType: h.asset.assetType,
+        shares,
+        costBasis,
+      });
+    }
+  }
+  const positions = [...byTicker.values()];
+
+  const tickers = positions.map((p) => p.ticker).join(",");
   const priceMap: Record<string, number> = {};
   if (tickers) {
     const pricesRes = await fetch(
@@ -101,23 +144,21 @@ export default async function DashboardPage({
       });
   }
 
-  const enrichedHoldings: EnrichedHolding[] = rawHoldings.map((h) => {
-    const shares = Number(h.quantity);
-    const avgCost = Number(h.avgCostBasis);
-    const costBasis = shares * avgCost;
-    const currentPrice = priceMap[h.asset.ticker] ?? null;
-    const marketValue = currentPrice !== null ? shares * currentPrice : null;
-    const gain = marketValue !== null ? marketValue - costBasis : null;
-    const gainPct = gain !== null ? (gain / costBasis) * 100 : null;
+  const enrichedHoldings: EnrichedHolding[] = positions.map((p) => {
+    const avgCost = p.shares !== 0 ? p.costBasis / p.shares : 0;
+    const currentPrice = priceMap[p.ticker] ?? null;
+    const marketValue = currentPrice !== null ? p.shares * currentPrice : null;
+    const gain = marketValue !== null ? marketValue - p.costBasis : null;
+    const gainPct = gain !== null && p.costBasis !== 0 ? (gain / p.costBasis) * 100 : null;
     return {
-      id: h.id,
-      ticker: h.asset.ticker,
-      name: h.asset.name,
-      currency: h.asset.currency,
-      assetType: h.asset.assetType,
-      shares,
+      id: p.id,
+      ticker: p.ticker,
+      name: p.name,
+      currency: p.currency,
+      assetType: p.assetType,
+      shares: p.shares,
       avgCost,
-      costBasis,
+      costBasis: p.costBasis,
       currentPrice,
       marketValue,
       gain,
@@ -143,7 +184,7 @@ export default async function DashboardPage({
       <div className="mb-6 flex items-center justify-between">
         <PortfolioSwitcher
           portfolios={portfolios}
-          activeId={selectedPortfolio.id}
+          activeId={showAll ? "all" : selectedPortfolio.id}
         />
         <div className="flex items-center gap-2">
           <CurrencyToggle />

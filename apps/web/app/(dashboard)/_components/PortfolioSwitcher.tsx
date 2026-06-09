@@ -32,6 +32,7 @@ export default function PortfolioSwitcher({
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
+        <SelectItem value="all">All Portfolios</SelectItem>
         {portfolios.map((p) => (
           <SelectItem key={p.id} value={p.id}>
             {p.name}
