@@ -21,14 +21,16 @@ interface Transaction {
   notes: string | null;
   transactedAt: string;
   asset: { ticker: string; name: string };
+  portfolioId: string;
+  portfolioName: string;
 }
 
 export default function TransactionsTable({
   transactions,
-  portfolioId,
+  showPortfolio,
 }: {
   transactions: Transaction[];
-  portfolioId: string;
+  showPortfolio: boolean;
 }) {
   if (transactions.length === 0) {
     return (
@@ -43,12 +45,15 @@ export default function TransactionsTable({
       <TableHeader>
         <TableRow>
           <TableHead>Date</TableHead>
+          {showPortfolio && <TableHead>Portfolio</TableHead>}
           <TableHead>Ticker</TableHead>
           <TableHead>Type</TableHead>
           <TableHead className="text-right">Quantity</TableHead>
           <TableHead className="text-right">Price</TableHead>
           <TableHead>Currency</TableHead>
           <TableHead className="text-right">Fee</TableHead>
+          <TableHead className="text-right">Total</TableHead>
+          <TableHead>Notes</TableHead>
           <TableHead className="w-12" />
         </TableRow>
       </TableHeader>
@@ -58,6 +63,11 @@ export default function TransactionsTable({
             <TableCell className="text-sm text-muted-foreground">
               {new Date(tx.transactedAt).toLocaleDateString()}
             </TableCell>
+            {showPortfolio && (
+              <TableCell className="text-sm text-muted-foreground">
+                {tx.portfolioName}
+              </TableCell>
+            )}
             <TableCell className="font-mono font-medium">
               {tx.asset.ticker}
             </TableCell>
@@ -76,9 +86,19 @@ export default function TransactionsTable({
             <TableCell className="text-right font-mono text-muted-foreground">
               {Number(tx.fee) > 0 ? Number(tx.fee).toFixed(2) : "—"}
             </TableCell>
+            <TableCell className="text-right font-mono font-medium">
+              {(
+                Number(tx.quantity) * Number(tx.price) +
+                (tx.type === "BUY" ? Number(tx.fee) : -Number(tx.fee))
+              ).toFixed(2)}{" "}
+              <span className="text-muted-foreground">{tx.currency}</span>
+            </TableCell>
+            <TableCell className="max-w-xs truncate text-sm text-muted-foreground">
+              {tx.notes || "—"}
+            </TableCell>
             <TableCell className="text-right">
               <DeleteTransactionButton
-                portfolioId={portfolioId}
+                portfolioId={tx.portfolioId}
                 txId={tx.id}
                 label={`${tx.type} ${Number(tx.quantity).toFixed(4)} ${tx.asset.ticker}`}
               />

@@ -14,10 +14,32 @@ import {
   type ChartConfig,
 } from "@/components/shadcn/Chart";
 import type { EnrichedHolding } from "../dashboard/page";
-import { tickerColorMap } from "./chartColors";
 
 const GAIN_COLOR = "#059669"; // emerald-600
 const LOSS_COLOR = "#ef4444"; // red-500
+
+// Foundation (cost) palette — deliberately excludes green/red so the base
+// segment never collides with the gain/loss delta cap above it.
+const BASE_PALETTE = [
+  "#2563eb", // blue-600
+  "#f59e0b", // amber-500
+  "#8b5cf6", // violet-500
+  "#ec4899", // pink-500
+  "#14b8a6", // teal-500
+  "#f97316", // orange-500
+  "#6366f1", // indigo-500
+  "#0ea5e9", // sky-500
+];
+
+function baseColorMap(tickers: string[]): Record<string, string> {
+  const unique = Array.from(new Set(tickers));
+  return Object.fromEntries(
+    unique.map((ticker, i) => [
+      ticker,
+      BASE_PALETTE[i % BASE_PALETTE.length] ?? "#64748b",
+    ])
+  );
+}
 
 interface ChartDatum {
   ticker: string;
@@ -48,7 +70,7 @@ export default function GainLossChart({
   holdings: EnrichedHolding[];
   priceCurrency: string;
 }) {
-  const colors = tickerColorMap(holdings.map((h) => h.ticker));
+  const colors = baseColorMap(holdings.map((h) => h.ticker));
   const data: ChartDatum[] = holdings
     .filter((h) => h.gain !== null && h.marketValue !== null)
     .map((h) => {
@@ -65,7 +87,8 @@ export default function GainLossChart({
         gainPct: h.gainPct,
         isGain: gain >= 0,
       };
-    });
+    })
+    .sort((a, b) => b.cost - a.cost);
 
   return (
     <Card>
