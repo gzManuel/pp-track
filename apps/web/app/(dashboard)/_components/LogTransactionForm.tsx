@@ -22,15 +22,35 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/shadcn/Select";
-import { logTransaction } from "../actions";
+import { logTransaction, updateTransaction } from "../actions";
 import TickerCombobox from "./TickerCombobox";
+
+// When present, the form edits this transaction instead of logging a new one.
+export interface EditableTransaction {
+  id: string;
+  portfolioId: string;
+  ticker: string;
+  type: string;
+  quantity: string;
+  price: string;
+  currency: string;
+  transactedAt: string;
+  fee: string;
+  notes: string | null;
+}
 
 const schema = z.object({
   portfolioId: z.string().min(1, "Required"),
   ticker: z.string().min(1, "Required"),
   type: z.enum(["BUY", "SELL"]),
-  quantity: z.string().min(1, "Required").refine((v) => Number(v) > 0, "Must be positive"),
-  price: z.string().min(1, "Required").refine((v) => Number(v) > 0, "Must be positive"),
+  quantity: z
+    .string()
+    .min(1, "Required")
+    .refine((v) => Number(v) > 0, "Must be positive"),
+  price: z
+    .string()
+    .min(1, "Required")
+    .refine((v) => Number(v) > 0, "Must be positive"),
   currency: z.enum(["USD", "ARS"]),
   transactedAt: z.string().min(1, "Required"),
   fee: z.string().optional(),
@@ -42,40 +62,69 @@ type FormValues = z.infer<typeof schema>;
 export default function LogTransactionForm({
   portfolios,
   defaultPortfolioId,
+  transaction,
   onSuccess,
 }: {
   portfolios: { id: string; name: string }[];
   defaultPortfolioId: string;
+  transaction?: EditableTransaction;
   onSuccess?: () => void;
 }) {
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
+  const submitLabel = transaction ? "Save changes" : "Save transaction";
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: {
-      portfolioId: defaultPortfolioId,
-      ticker: "",
-      type: "BUY",
-      quantity: undefined,
-      price: undefined,
-      currency: "USD",
-      transactedAt: new Date().toLocaleDateString("en-CA"),
-      fee: undefined,
-      notes: "",
-    },
+    defaultValues: transaction
+      ? {
+          portfolioId: transaction.portfolioId,
+          ticker: transaction.ticker,
+          type: transaction.type === "SELL" ? "SELL" : "BUY",
+          quantity: String(Number(transaction.quantity)),
+          price: String(Number(transaction.price)),
+          currency: transaction.currency === "ARS" ? "ARS" : "USD",
+          // Stored timestamps are anchored to a calendar day; render it for <input type="date">.
+          transactedAt: new Date(transaction.transactedAt).toLocaleDateString(
+            "en-CA",
+          ),
+          fee:
+            Number(transaction.fee) > 0 ? String(Number(transaction.fee)) : "",
+          notes: transaction.notes ?? "",
+        }
+      : {
+          portfolioId: defaultPortfolioId,
+          ticker: "",
+          type: "BUY",
+          quantity: undefined,
+          price: undefined,
+          currency: "USD",
+          transactedAt: new Date().toLocaleDateString("en-CA"),
+          fee: undefined,
+          notes: "",
+        },
   });
 
   function onSubmit(values: FormValues) {
     startTransition(async () => {
       const { portfolioId, ...data } = values;
-      await logTransaction(portfolioId, {
+      const payload = {
         ...data,
         quantity: Number(values.quantity),
         price: Number(values.price),
         fee: values.fee ? Number(values.fee) : undefined,
-      });
-      form.reset();
+      };
+
+      if (transaction) {
+        await updateTransaction(transaction.portfolioId, transaction.id, {
+          ...payload,
+          portfolioId,
+        });
+      } else {
+        await logTransaction(portfolioId, payload);
+        form.reset();
+      }
+
       router.refresh();
       onSuccess?.();
     });
@@ -135,7 +184,10 @@ export default function LogTransactionForm({
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Type</FormLabel>
-                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                <Select
+                  onValueChange={field.onChange}
+                  defaultValue={field.value}
+                >
                   <FormControl>
                     <SelectTrigger>
                       <SelectValue />
@@ -173,7 +225,12 @@ export default function LogTransactionForm({
               <FormItem>
                 <FormLabel>Price per share</FormLabel>
                 <FormControl>
-                  <Input type="number" step="any" placeholder="0.00" {...field} />
+                  <Input
+                    type="number"
+                    step="any"
+                    placeholder="0.00"
+                    {...field}
+                  />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -188,7 +245,10 @@ export default function LogTransactionForm({
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Currency</FormLabel>
-                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                <Select
+                  onValueChange={field.onChange}
+                  defaultValue={field.value}
+                >
                   <FormControl>
                     <SelectTrigger>
                       <SelectValue />
@@ -247,7 +307,7 @@ export default function LogTransactionForm({
         />
 
         <Button type="submit" disabled={isPending} className="self-start">
-          {isPending ? "Saving..." : "Save transaction"}
+          {isPending ? "Saving..." : submitLabel}
         </Button>
       </form>
     </Form>

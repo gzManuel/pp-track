@@ -10,6 +10,7 @@ import {
   TableRow,
 } from "@/components/shadcn/Table";
 import DeleteTransactionButton from "./DeleteTransactionButton";
+import EditTransactionDialog from "./EditTransactionDialog";
 
 interface Transaction {
   id: string;
@@ -28,9 +29,11 @@ interface Transaction {
 export default function TransactionsTable({
   transactions,
   showPortfolio,
+  portfolios,
 }: {
   transactions: Transaction[];
   showPortfolio: boolean;
+  portfolios: { id: string; name: string }[];
 }) {
   if (transactions.length === 0) {
     return (
@@ -54,7 +57,7 @@ export default function TransactionsTable({
           <TableHead className="text-right">Fee</TableHead>
           <TableHead className="text-right">Total</TableHead>
           <TableHead>Notes</TableHead>
-          <TableHead className="w-12" />
+          <TableHead className="w-24" />
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -97,11 +100,28 @@ export default function TransactionsTable({
               {tx.notes || "—"}
             </TableCell>
             <TableCell className="text-right">
-              <DeleteTransactionButton
-                portfolioId={tx.portfolioId}
-                txId={tx.id}
-                label={`${tx.type} ${Number(tx.quantity).toFixed(4)} ${tx.asset.ticker}`}
-              />
+              <div className="flex items-center justify-end gap-1">
+                <EditTransactionDialog
+                  portfolios={portfolios}
+                  transaction={{
+                    id: tx.id,
+                    portfolioId: tx.portfolioId,
+                    ticker: tx.asset.ticker,
+                    type: tx.type,
+                    quantity: tx.quantity,
+                    price: tx.price,
+                    currency: tx.currency,
+                    transactedAt: tx.transactedAt,
+                    fee: tx.fee,
+                    notes: tx.notes,
+                  }}
+                />
+                <DeleteTransactionButton
+                  portfolioId={tx.portfolioId}
+                  txId={tx.id}
+                  label={`${tx.type} ${Number(tx.quantity).toFixed(4)} ${tx.asset.ticker}`}
+                />
+              </div>
             </TableCell>
           </TableRow>
         ))}

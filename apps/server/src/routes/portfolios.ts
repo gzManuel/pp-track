@@ -18,7 +18,7 @@ const createTransactionBody = z.object({
   // Accept any casing from the client, validate against the known set.
   type: z.preprocess(
     (v) => (typeof v === "string" ? v.toUpperCase() : v),
-    z.enum(["BUY", "SELL", "DIVIDEND", "FEE"])
+    z.enum(["BUY", "SELL", "DIVIDEND", "FEE"]),
   ),
   quantity: z.number().positive(),
   price: z.number().nonnegative(),
@@ -31,15 +31,68 @@ const createTransactionBody = z.object({
       typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v)
         ? new Date(`${v}T20:00:00.000Z`)
         : v,
-    z.coerce.date()
+    z.coerce.date(),
   ),
   fee: z.number().nonnegative().optional(),
   notes: z.string().optional(),
 });
 
+// Edits accept the same fields plus an optional target portfolio — supplying a
+// different id moves the transaction (and its holding effect) between portfolios.
+const updateTransactionBody = createTransactionBody.extend({
+  portfolioId: z.uuid().optional(),
+});
+
 const portfoliosRoutes: FastifyPluginAsync = async (fastify) => {
   // Opt this plugin's routes into Zod-typed request/reply inference.
   const app = fastify.withTypeProvider<ZodTypeProvider>();
+
+  // Resolves the asset a transaction points at, applying the CEDEAR ARS→USD
+  // conversion and creating the Asset row on first sight. Shared by create/edit
+  // so both normalize tickers and amounts identically.
+  async function resolveAsset(input: {
+    ticker: string;
+    price: number;
+    currency: string;
+    fee?: number;
+    transactedAt: Date;
+  }) {
+    let { ticker, price, currency, fee } = input;
+
+    // CEDEARs are stored in USD. When logged in ARS against a peso ticker
+    // (e.g. SPY.BA), convert price/fee to the USD `D` variant (SPYD.BA) using
+    // the dólar MEP implied by the pair at the trade date.
+    const usdTicker = toUsdTicker(ticker);
+    if (currency.toUpperCase() === "ARS" && usdTicker !== ticker) {
+      const mep = await getMepRate(input.transactedAt);
+      price /= mep;
+      if (fee) fee /= mep;
+      ticker = usdTicker;
+      currency = "USD";
+    }
+
+    let asset = await app.prisma.asset.findFirst({ where: { ticker } });
+    if (!asset) {
+      try {
+        const quote = await fetchQuote(ticker);
+        asset = await app.prisma.asset.create({
+          data: {
+            ticker,
+            name: quote.name,
+            assetType: quote.quoteType,
+            exchange: quote.exchange,
+            currency: quote.currency,
+          },
+        });
+      } catch {
+        asset = await app.prisma.asset.create({
+          data: { ticker, name: ticker, assetType: "EQUITY", currency },
+        });
+      }
+    }
+
+    return { asset, price, currency, fee: fee ?? 0 };
+  }
 
   // #2 — `app.authenticate` runs first and sets `request.userId`.
   // #3 — `app.prisma` is the decorated shared client (no direct import).
@@ -47,7 +100,7 @@ const portfoliosRoutes: FastifyPluginAsync = async (fastify) => {
     app.prisma.portfolio.findMany({
       where: { userId: request.userId },
       orderBy: [{ isDefault: "desc" }, { createdAt: "asc" }],
-    })
+    }),
   );
 
   app.post(
@@ -62,7 +115,7 @@ const portfoliosRoutes: FastifyPluginAsync = async (fastify) => {
       return app.prisma.portfolio.create({
         data: { userId: request.userId, name, isDefault: existingCount === 0 },
       });
-    }
+    },
   );
 
   app.get(
@@ -90,7 +143,7 @@ const portfoliosRoutes: FastifyPluginAsync = async (fastify) => {
         },
         orderBy: { createdAt: "asc" },
       });
-    }
+    },
   );
 
   app.get(
@@ -109,7 +162,7 @@ const portfoliosRoutes: FastifyPluginAsync = async (fastify) => {
         include: { asset: { select: { ticker: true, name: true } } },
         orderBy: [{ transactedAt: "desc" }, { createdAt: "desc" }],
       });
-    }
+    },
   );
 
   app.post(
@@ -127,42 +180,20 @@ const portfoliosRoutes: FastifyPluginAsync = async (fastify) => {
       }
 
       const { type, quantity, transactedAt, notes } = request.body;
-      let { ticker, price, currency, fee } = request.body;
-
-      // CEDEARs are stored in USD. When logged in ARS against a peso ticker
-      // (e.g. SPY.BA), convert price/fee to the USD `D` variant (SPYD.BA) using
-      // the dólar MEP implied by the pair at the trade date.
-      const usdTicker = toUsdTicker(ticker);
-      if (currency.toUpperCase() === "ARS" && usdTicker !== ticker) {
-        const mep = await getMepRate(transactedAt);
-        price = price / mep;
-        if (fee) fee = fee / mep;
-        ticker = usdTicker;
-        currency = "USD";
-      }
-
-      let asset = await app.prisma.asset.findFirst({ where: { ticker } });
-      if (!asset) {
-        try {
-          const quote = await fetchQuote(ticker);
-          asset = await app.prisma.asset.create({
-            data: {
-              ticker,
-              name: quote.name,
-              assetType: quote.quoteType,
-              exchange: quote.exchange,
-              currency: quote.currency,
-            },
-          });
-        } catch {
-          asset = await app.prisma.asset.create({
-            data: { ticker, name: ticker, assetType: "EQUITY", currency },
-          });
-        }
-      }
+      const {
+        asset,
+        price,
+        currency,
+        fee: txFee,
+      } = await resolveAsset({
+        ticker: request.body.ticker,
+        price: request.body.price,
+        currency: request.body.currency,
+        fee: request.body.fee,
+        transactedAt,
+      });
 
       const assetId = asset.id;
-      const txFee = fee ?? 0;
 
       // Record the transaction and move the holding atomically.
       return app.prisma.$transaction(async (tx) => {
@@ -183,12 +214,109 @@ const portfoliosRoutes: FastifyPluginAsync = async (fastify) => {
 
         // Only buys and sells move the position; dividends/fees leave it alone.
         if (type === "BUY" || type === "SELL") {
-          await updateHolding(tx, request.params.id, assetId, type, quantity, price, txFee);
+          await updateHolding(
+            tx,
+            request.params.id,
+            assetId,
+            type,
+            quantity,
+            price,
+            txFee,
+          );
         }
 
         return transaction;
       });
-    }
+    },
+  );
+
+  app.patch(
+    "/portfolios/:id/transactions/:txId",
+    {
+      preHandler: app.authenticate,
+      schema: { params: transactionParams, body: updateTransactionBody },
+    },
+    async (request, reply) => {
+      const portfolio = await app.prisma.portfolio.findFirst({
+        where: { id: request.params.id, userId: request.userId },
+      });
+      if (!portfolio) {
+        return reply.status(404).send({ error: "Portfolio not found" });
+      }
+
+      const existing = await app.prisma.transaction.findFirst({
+        where: { id: request.params.txId, portfolioId: request.params.id },
+      });
+      if (!existing) {
+        return reply.status(404).send({ error: "Transaction not found" });
+      }
+
+      // An edit may move the transaction to another of the user's portfolios.
+      const targetPortfolioId = request.body.portfolioId ?? request.params.id;
+      if (targetPortfolioId !== request.params.id) {
+        const target = await app.prisma.portfolio.findFirst({
+          where: { id: targetPortfolioId, userId: request.userId },
+        });
+        if (!target) {
+          return reply
+            .status(404)
+            .send({ error: "Target portfolio not found" });
+        }
+      }
+
+      const { type, quantity, transactedAt, notes } = request.body;
+      const { asset, price, currency, fee } = await resolveAsset({
+        ticker: request.body.ticker,
+        price: request.body.price,
+        currency: request.body.currency,
+        fee: request.body.fee,
+        transactedAt,
+      });
+
+      // Edit as remove-then-add: rebuild the old holding without this transaction
+      // (using its pre-edit asset/portfolio/values, still in the DB), persist the
+      // new values, then re-apply to the now-current holding. This naturally
+      // handles ticker, portfolio, and amount changes in one atomic step.
+      return app.prisma.$transaction(async (tx) => {
+        await recomputeHolding(
+          tx,
+          existing.portfolioId,
+          existing.assetId,
+          existing.id,
+        );
+
+        const updated = await tx.transaction.update({
+          where: { id: existing.id },
+          data: {
+            portfolioId: targetPortfolioId,
+            assetId: asset.id,
+            type,
+            quantity,
+            price,
+            currency,
+            fee,
+            notes,
+            transactedAt,
+          },
+          include: { asset: { select: { ticker: true, name: true } } },
+        });
+
+        // Only buys and sells move the position; dividends/fees leave it alone.
+        if (type === "BUY" || type === "SELL") {
+          await updateHolding(
+            tx,
+            targetPortfolioId,
+            asset.id,
+            type,
+            quantity,
+            price,
+            fee,
+          );
+        }
+
+        return updated;
+      });
+    },
   );
 
   app.delete(
@@ -213,12 +341,17 @@ const portfoliosRoutes: FastifyPluginAsync = async (fastify) => {
 
       // Delete and rebuild the affected holding atomically.
       await app.prisma.$transaction(async (tx) => {
-        await recomputeHolding(tx, request.params.id, transaction.assetId, transaction.id);
+        await recomputeHolding(
+          tx,
+          request.params.id,
+          transaction.assetId,
+          transaction.id,
+        );
         await tx.transaction.delete({ where: { id: transaction.id } });
       });
 
       return reply.status(204).send();
-    }
+    },
   );
 };
 
@@ -234,7 +367,7 @@ async function updateHolding(
   type: "BUY" | "SELL",
   quantity: number,
   price: number,
-  fee: number
+  fee: number,
 ) {
   const existing = await tx.holding.findUnique({
     where: { portfolioId_assetId: { portfolioId, assetId } },
@@ -291,19 +424,30 @@ const QTY_EPSILON = 1e-8;
 // cost basis (avgCostBasis * quantity). A BUY adds price*qty + fee; a SELL removes shares
 // at the running average (value drops proportionally, so the average is unchanged).
 function replayPosition(
-  transactions: { type: string; quantity: Prisma.Decimal; price: Prisma.Decimal; fee: Prisma.Decimal }[]
+  transactions: {
+    type: string;
+    quantity: Prisma.Decimal;
+    price: Prisma.Decimal;
+    fee: Prisma.Decimal;
+  }[],
 ): { quantity: number; value: number } {
   return transactions.reduce(
     (pos, t) => {
       const qty = Number(t.quantity);
       if (t.type === "BUY") {
-        return { quantity: pos.quantity + qty, value: pos.value + qty * Number(t.price) + Number(t.fee) };
+        return {
+          quantity: pos.quantity + qty,
+          value: pos.value + qty * Number(t.price) + Number(t.fee),
+        };
       }
       const avg = pos.quantity > 0 ? pos.value / pos.quantity : 0;
       const sold = Math.min(qty, pos.quantity);
-      return { quantity: Math.max(0, pos.quantity - qty), value: Math.max(0, pos.value - sold * avg) };
+      return {
+        quantity: Math.max(0, pos.quantity - qty),
+        value: Math.max(0, pos.value - sold * avg),
+      };
     },
-    { quantity: 0, value: 0 }
+    { quantity: 0, value: 0 },
   );
 }
 
@@ -318,7 +462,7 @@ async function recomputeHolding(
   tx: Prisma.TransactionClient,
   portfolioId: string,
   assetId: string,
-  transactionId: string
+  transactionId: string,
 ) {
   // All BUY/SELL for this position, including the one about to be deleted (it's removed
   // from the DB after this runs). createdAt breaks ties between same-day trades (all
@@ -333,7 +477,9 @@ async function recomputeHolding(
   });
 
   const all = replayPosition(transactions);
-  const remaining = replayPosition(transactions.filter((t) => t.id !== transactionId));
+  const remaining = replayPosition(
+    transactions.filter((t) => t.id !== transactionId),
+  );
 
   // The portion of the current holding not explained by its transactions (an imported base,
   // or ~0 for a transaction-built holding). Drop sub-precision residue so it can't survive.

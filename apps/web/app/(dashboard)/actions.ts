@@ -22,7 +22,7 @@ export type TickerSearchResult = {
 };
 
 export async function searchTickers(
-  query: string
+  query: string,
 ): Promise<TickerSearchResult[]> {
   const q = query.trim();
   if (!q) return [];
@@ -32,7 +32,7 @@ export async function searchTickers(
 
   const res = await fetch(
     `${serverUrl}/api/assets/search?q=${encodeURIComponent(q)}`,
-    { headers: authHeaders(session.user.id) }
+    { headers: authHeaders(session.user.id) },
   );
 
   if (!res.ok) throw new Error("Failed to search tickers");
@@ -64,18 +64,52 @@ export async function logTransaction(
     transactedAt: string;
     fee?: number;
     notes?: string;
-  }
+  },
 ) {
   const session = await getServerSession(authOptions);
   if (!session) throw new Error("Unauthorized");
 
-  const res = await fetch(`${serverUrl}/api/portfolios/${portfolioId}/transactions`, {
-    method: "POST",
-    headers: authHeaders(session.user.id),
-    body: JSON.stringify(data),
-  });
+  const res = await fetch(
+    `${serverUrl}/api/portfolios/${portfolioId}/transactions`,
+    {
+      method: "POST",
+      headers: authHeaders(session.user.id),
+      body: JSON.stringify(data),
+    },
+  );
 
   if (!res.ok) throw new Error("Failed to log transaction");
+  return res.json();
+}
+
+export async function updateTransaction(
+  portfolioId: string,
+  txId: string,
+  data: {
+    portfolioId?: string;
+    ticker: string;
+    type: string;
+    quantity: number;
+    price: number;
+    currency: string;
+    transactedAt: string;
+    fee?: number;
+    notes?: string;
+  },
+) {
+  const session = await getServerSession(authOptions);
+  if (!session) throw new Error("Unauthorized");
+
+  const res = await fetch(
+    `${serverUrl}/api/portfolios/${portfolioId}/transactions/${txId}`,
+    {
+      method: "PATCH",
+      headers: authHeaders(session.user.id),
+      body: JSON.stringify(data),
+    },
+  );
+
+  if (!res.ok) throw new Error("Failed to update transaction");
   return res.json();
 }
 
@@ -92,7 +126,7 @@ export async function deleteTransaction(portfolioId: string, txId: string) {
         "x-internal-secret": process.env.INTERNAL_API_SECRET!,
         "x-user-id": session.user.id,
       },
-    }
+    },
   );
 
   if (!res.ok) throw new Error("Failed to delete transaction");
