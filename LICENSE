@@ -1,0 +1,55 @@
+Business Source License 1.1
+===========================
+
+This software is licensed under the Business Source License 1.1 (the
+"License"). It is NOT an Open Source license (as defined by the Open Source
+Initiative), although the full source is publicly available.
+
+The full, canonical text of the Business Source License 1.1 is published by
+MariaDB Corporation Ab at:
+
+    https://mariadb.com/bsl11/
+
+That text governs your use of this software, together with the parameters
+specified below. The parameters below customize the License for this project,
+as permitted by the License itself.
+
+License Parameters
+------------------
+
+Licensor:             Manuel Garisto
+
+Licensed Work:        pp-track
+                      The Licensed Work is © 2026 Manuel Garisto.
+
+Additional Use Grant: You may make production use of the Licensed Work,
+                      provided that such use does not include offering the
+                      Licensed Work to third parties as a hosted or managed
+                      service whose value derives, in whole or in part, from
+                      the functionality of the Licensed Work (for example, a
+                      commercial "portfolio tracking as a service" offering).
+
+                      Permitted production use includes, without limitation:
+                      using the Licensed Work for your own personal portfolio
+                      tracking, and self-hosting the Licensed Work for your own
+                      internal, non-commercial use.
+
+Change Date:          2030-06-15
+
+Change License:       Apache License, Version 2.0
+
+Summary (non-binding)
+---------------------
+
+The terms above are a convenience summary and are not a substitute for the
+full License text linked above. In case of any conflict, the full License
+text plus the parameters in this file control.
+
+  - You may view, copy, modify, and self-host this software for personal and
+    internal, non-commercial use.
+  - You may NOT offer this software to third parties as a competing hosted or
+    commercial service before the Change Date.
+  - On the Change Date (2030-06-15), this software automatically becomes
+    available under the Change License (Apache License, Version 2.0).
+  - For uses not permitted by this License, you must obtain a commercial
+    license from the Licensor (garistozm@outlook.com).

@@ -1,159 +1,119 @@
-# Turborepo starter
+# pp-track
 
-This Turborepo starter is maintained by the Turborepo core team.
+A portfolio tracking application. Track investments across multiple portfolios, log buy/sell/fee transactions, and monitor asset prices for stocks and CEDEARs.
 
-## Using this example
+## Features
 
-Run the following command:
+- Multiple portfolios per user with a portfolio switcher
+- Holdings with quantity and average cost basis per portfolio/asset
+- Transaction log (buy / sell / fee records)
+- Live and historical asset prices via [yahoo-finance2](https://github.com/gadicc/node-yahoo-finance2) (stocks and CEDEARs, USD via `.BA` D-suffix tickers)
+- Charts powered by Recharts
+- OAuth sign-in (Google, Facebook) via NextAuth
 
-```sh
-npx create-turbo@latest
-```
+## Tech stack
 
-## What's inside?
+[Turborepo](https://turbo.build/) monorepo managed with `pnpm` workspaces.
 
-This Turborepo includes the following packages/apps:
+- **`apps/web`** — Next.js 16 frontend (React 19, Tailwind CSS v4, shadcn/ui, NextAuth)
+- **`apps/server`** — Fastify 5 backend with Prisma 7 + PostgreSQL
+- **`packages/ui`** — Shared React component library (`@repo/ui`)
+- **`packages/eslint-config`** — Shared ESLint configs
+- **`packages/typescript-config`** — Shared `tsconfig.json` presets
 
-### Apps and Packages
+The web app talks to the server over HTTP; requests are authenticated with a shared `INTERNAL_API_SECRET`.
 
-- `docs`: a [Next.js](https://nextjs.org/) app
-- `web`: another [Next.js](https://nextjs.org/) app
-- `@repo/ui`: a stub React component library shared by both `web` and `docs` applications
-- `@repo/eslint-config`: `eslint` configurations (includes `eslint-config-next` and `eslint-config-prettier`)
-- `@repo/typescript-config`: `tsconfig.json`s used throughout the monorepo
+## Prerequisites
 
-Each package/app is 100% [TypeScript](https://www.typescriptlang.org/).
+- Node.js >= 18
+- pnpm 9 (`corepack enable`)
+- A running PostgreSQL instance
 
-### Utilities
-
-This Turborepo has some additional tools already setup for you:
-
-- [TypeScript](https://www.typescriptlang.org/) for static type checking
-- [ESLint](https://eslint.org/) for code linting
-- [Prettier](https://prettier.io) for code formatting
-
-### Build
-
-To build all apps and packages, run the following command:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended):
+## Getting started
 
 ```sh
-cd my-turborepo
-turbo build
+# 1. Install dependencies (from the repo root)
+pnpm install
+
+# 2. Configure environment variables (see below)
+#    apps/server/.env  and  apps/web/.env.local
+
+# 3. Apply database migrations and generate the Prisma client
+pnpm migrate
+
+# 4. Start all apps
+pnpm dev
 ```
 
-Without global `turbo`, use your package manager:
+- Web app: http://localhost:3000
+- API server: http://localhost:3001
+
+## Environment variables
+
+### `apps/server/.env`
+
+| Variable              | Description                                              |
+| --------------------- | -------------------------------------------------------- |
+| `DATABASE_URL`        | PostgreSQL connection string (driver-adapter mode)       |
+| `INTERNAL_API_SECRET` | Shared secret used to authenticate requests from the web |
+| `PORT`                | Server port (optional, defaults to `3001`)               |
+| `HOST`                | Bind host (optional, defaults to `0.0.0.0`)              |
+
+Prisma uses `@prisma/adapter-pg` (driver-adapter mode, not the default engine).
+
+### `apps/web/.env.local`
+
+| Variable                                | Description                                       |
+| --------------------------------------- | ------------------------------------------------- |
+| `SERVER_API_URL`                        | Base URL of the Fastify server (e.g. `http://localhost:3001`) |
+| `INTERNAL_API_SECRET`                   | Must match the server's value                     |
+| `NEXTAUTH_URL` / `NEXTAUTH_SECRET`      | NextAuth base URL and session secret              |
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`     | Google OAuth credentials                  |
+| `FACEBOOK_CLIENT_ID` / `FACEBOOK_CLIENT_SECRET` | Facebook OAuth credentials                |
+
+## Commands
+
+Run from the repo root:
 
 ```sh
-cd my-turborepo
-npx turbo build
-pnpm dlx turbo build
-pnpm exec turbo build
+pnpm dev                          # start all apps
+pnpm dev --filter=web             # start only the Next.js frontend (port 3000)
+pnpm dev --filter=server          # start only the Fastify server (port 3001)
+pnpm build                        # build all apps
+pnpm lint                         # lint all packages
+pnpm check-types                  # type-check all packages
+pnpm format                       # prettier-format all TS/TSX/MD files
+pnpm migrate                      # run Prisma migrations against the dev database
 ```
 
-You can build a specific package by using a [filter](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters):
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed:
+### Prisma (run from `apps/server`)
 
 ```sh
-turbo build --filter=docs
+pnpm migrate                      # apply migrations and regenerate the client (dev)
+pnpm migrate:deploy               # apply migrations without prompting (production)
+pnpm prisma generate              # regenerate the client without migrating
+pnpm prisma studio                # open Prisma Studio
 ```
 
-Without global `turbo`:
+## Data model
 
-```sh
-npx turbo build --filter=docs
-pnpm exec turbo build --filter=docs
-pnpm exec turbo build --filter=docs
-```
+Core models live in `apps/server/prisma/schema.prisma`:
 
-### Develop
+- **User** → many **Portfolio**, many **Watchlist**
+- **Portfolio** → many **Holding**, many **Transaction**
+- **Asset** — normalized asset registry (ticker + exchange unique); referenced by Holding, Transaction, PriceSnapshot, Watchlist
+- **Holding** — current position (quantity + average cost basis) per portfolio/asset pair
+- **Transaction** — individual buy/sell/fee records
+- **PriceSnapshot** — historical price records, indexed on `(assetId, recordedAt)`
 
-To develop all apps and packages, run the following command:
+All monetary quantities use `Decimal(18,8)`; UUIDs are used for all primary keys.
 
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended):
+## License
 
-```sh
-cd my-turborepo
-turbo dev
-```
+This project is **source-available** under the [Business Source License 1.1](./LICENSE) — not an OSI open-source license.
 
-Without global `turbo`, use your package manager:
+- You may view, modify, and self-host it for personal and internal, non-commercial use.
+- You may **not** offer it to third parties as a competing hosted/commercial service before the Change Date.
+- On **2030-06-15** it automatically converts to the **Apache License 2.0**.
 
-```sh
-cd my-turborepo
-npx turbo dev
-pnpm exec turbo dev
-pnpm exec turbo dev
-```
-
-You can develop a specific package by using a [filter](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters):
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed:
-
-```sh
-turbo dev --filter=web
-```
-
-Without global `turbo`:
-
-```sh
-npx turbo dev --filter=web
-pnpm exec turbo dev --filter=web
-pnpm exec turbo dev --filter=web
-```
-
-### Remote Caching
-
-> [!TIP]
-> Vercel Remote Cache is free for all plans. Get started today at [vercel.com](https://vercel.com/signup?utm_source=remote-cache-sdk&utm_campaign=free_remote_cache).
-
-Turborepo can use a technique known as [Remote Caching](https://turborepo.dev/docs/core-concepts/remote-caching) to share cache artifacts across machines, enabling you to share build caches with your team and CI/CD pipelines.
-
-By default, Turborepo will cache locally. To enable Remote Caching you will need an account with Vercel. If you don't have an account you can [create one](https://vercel.com/signup?utm_source=turborepo-examples), then enter the following commands:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended):
-
-```sh
-cd my-turborepo
-turbo login
-```
-
-Without global `turbo`, use your package manager:
-
-```sh
-cd my-turborepo
-npx turbo login
-pnpm exec turbo login
-pnpm exec turbo login
-```
-
-This will authenticate the Turborepo CLI with your [Vercel account](https://vercel.com/docs/concepts/personal-accounts/overview).
-
-Next, you can link your Turborepo to your Remote Cache by running the following command from the root of your Turborepo:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed:
-
-```sh
-turbo link
-```
-
-Without global `turbo`:
-
-```sh
-npx turbo link
-pnpm exec turbo link
-pnpm exec turbo link
-```
-
-## Useful Links
-
-Learn more about the power of Turborepo:
-
-- [Tasks](https://turborepo.dev/docs/crafting-your-repository/running-tasks)
-- [Caching](https://turborepo.dev/docs/crafting-your-repository/caching)
-- [Remote Caching](https://turborepo.dev/docs/core-concepts/remote-caching)
-- [Filtering](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters)
-- [Configuration Options](https://turborepo.dev/docs/reference/configuration)
-- [CLI Usage](https://turborepo.dev/docs/reference/command-line-reference)
+For commercial use beyond the grant, contact garistozm@outlook.com. See [`LICENSE`](./LICENSE) for the full terms.
