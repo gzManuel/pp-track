@@ -64,13 +64,29 @@ export default async function DashboardPage({
   const portfoliosRes = await serverFetch(`${serverUrl}/api/portfolios`, userId);
   const portfolios: Portfolio[] = await portfoliosRes.json();
 
+  // Resolve which portfolios to show. Absent param keeps the old default (the
+  // default/first portfolio); "all" aggregates everything; "none" is an explicit
+  // empty selection; a comma list selects a subset.
   const showAll = portfolio === "all";
-  const selectedPortfolio =
-    (portfolio && portfolios.find((p) => p.id === portfolio)) ||
-    portfolios.find((p) => p.isDefault) ||
-    portfolios[0];
+  const explicitNone = portfolio === "none";
+  const ids =
+    portfolio && portfolio !== "all" && portfolio !== "none"
+      ? portfolio.split(",").filter(Boolean)
+      : [];
+  const defaultPortfolio =
+    portfolios.find((p) => p.isDefault) ?? portfolios[0];
+  let selectedPortfolios: Portfolio[];
+  if (showAll) {
+    selectedPortfolios = portfolios;
+  } else if (ids.length > 0) {
+    selectedPortfolios = portfolios.filter((p) => ids.includes(p.id));
+  } else if (explicitNone || !defaultPortfolio) {
+    selectedPortfolios = [];
+  } else {
+    selectedPortfolios = [defaultPortfolio];
+  }
 
-  if (!selectedPortfolio) {
+  if (portfolios.length === 0) {
     return (
       <div className="flex flex-col items-center gap-3 py-20 text-center">
         <h1 className="text-xl font-semibold">No portfolio yet</h1>
@@ -82,9 +98,32 @@ export default async function DashboardPage({
     );
   }
 
-  // "All Portfolios" aggregates every portfolio's positions; otherwise just the
-  // selected one. Same asset across portfolios is merged into one row below.
-  const loadedPortfolios = showAll ? portfolios : [selectedPortfolio];
+  const selectedIds = selectedPortfolios.map((p) => p.id);
+  const allSelected = showAll || (!explicitNone && ids.length === 0);
+
+  if (selectedPortfolios.length === 0) {
+    return (
+      <>
+        <div className="mb-6 flex items-center justify-between">
+          <PortfolioSwitcher
+            portfolios={portfolios}
+            selectedIds={selectedIds}
+            allSelected={allSelected}
+          />
+        </div>
+        <p className="py-20 text-center text-sm text-muted-foreground">
+          No portfolios selected. Pick one from the switcher to see your
+          positions.
+        </p>
+      </>
+    );
+  }
+
+  const primaryPortfolio = selectedPortfolios[0]!;
+
+  // The selected portfolios are aggregated; the same asset across portfolios is
+  // merged into one row below.
+  const loadedPortfolios = selectedPortfolios;
   const holdingsLists: RawHolding[][] = await Promise.all(
     loadedPortfolios.map((p) =>
       serverFetch(`${serverUrl}/api/portfolios/${p.id}/holdings`, userId).then(
@@ -184,14 +223,15 @@ export default async function DashboardPage({
       <div className="mb-6 flex items-center justify-between">
         <PortfolioSwitcher
           portfolios={portfolios}
-          activeId={showAll ? "all" : selectedPortfolio.id}
+          selectedIds={selectedIds}
+          allSelected={allSelected}
         />
         <div className="flex items-center gap-2">
           <CurrencyToggle />
           <RefreshButton />
           <LogTransactionDialog
             portfolios={portfolios}
-            defaultPortfolioId={selectedPortfolio.id}
+            defaultPortfolioId={primaryPortfolio.id}
           />
         </div>
       </div>

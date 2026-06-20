@@ -47,15 +47,18 @@ export default async function TransactionsPage({
   const portfoliosRes = await serverFetch(`${serverUrl}/api/portfolios`, userId);
   const portfolios: Portfolio[] = await portfoliosRes.json();
 
-  // Default (no query param) shows every portfolio's transactions; an explicit
-  // portfolio id narrows the view to just that one.
+  // Default (no query param) shows every portfolio's transactions; "all" does
+  // the same, "none" is an explicit empty selection, and a comma list narrows
+  // to a subset.
   const showAll = portfolio === undefined || portfolio === "all";
-  const selectedPortfolio =
-    (portfolio && portfolios.find((p) => p.id === portfolio)) ||
-    portfolios.find((p) => p.isDefault) ||
-    portfolios[0];
+  const explicitNone = portfolio === "none";
+  const ids =
+    !showAll && !explicitNone ? portfolio!.split(",").filter(Boolean) : [];
+  const selectedPortfolios = showAll
+    ? portfolios
+    : portfolios.filter((p) => ids.includes(p.id));
 
-  if (!selectedPortfolio) {
+  if (portfolios.length === 0) {
     return (
       <p className="py-20 text-center text-sm text-muted-foreground">
         No portfolio yet. Create one from the Portfolios tab.
@@ -63,10 +66,35 @@ export default async function TransactionsPage({
     );
   }
 
+  const selectedIds = selectedPortfolios.map((p) => p.id);
+  const primaryPortfolio =
+    selectedPortfolios[0] ??
+    portfolios.find((p) => p.isDefault) ??
+    portfolios[0]!;
+
+  if (selectedPortfolios.length === 0) {
+    return (
+      <>
+        <div className="mb-6 flex items-center justify-between">
+          <h1 className="text-2xl font-semibold">Transactions</h1>
+          <PortfolioSwitcher
+            portfolios={portfolios}
+            selectedIds={selectedIds}
+            allSelected={showAll}
+          />
+        </div>
+        <p className="py-20 text-center text-sm text-muted-foreground">
+          No portfolios selected. Pick one from the switcher to see
+          transactions.
+        </p>
+      </>
+    );
+  }
+
   // Fetch per portfolio (no aggregate endpoint), tag each transaction with its
   // portfolio so the table can label rows and target deletes correctly, then
   // re-sort the merged list since each portfolio's list is sorted on its own.
-  const loadedPortfolios = showAll ? portfolios : [selectedPortfolio];
+  const loadedPortfolios = selectedPortfolios;
   const txLists = await Promise.all(
     loadedPortfolios.map((p) =>
       serverFetch(`${serverUrl}/api/portfolios/${p.id}/transactions`, userId)
@@ -89,21 +117,22 @@ export default async function TransactionsPage({
         <h1 className="text-2xl font-semibold">Transactions</h1>
         <PortfolioSwitcher
           portfolios={portfolios}
-          activeId={showAll ? "all" : selectedPortfolio.id}
+          selectedIds={selectedIds}
+          allSelected={showAll}
         />
       </div>
       <section className="mb-10 max-w-2xl">
         <h2 className="mb-3 text-lg font-medium">Log transaction</h2>
         <LogTransactionForm
           portfolios={portfolios}
-          defaultPortfolioId={selectedPortfolio.id}
+          defaultPortfolioId={primaryPortfolio.id}
         />
       </section>
       <section>
         <h2 className="mb-3 text-lg font-medium">History</h2>
         <TransactionsTable
           transactions={transactions}
-          showPortfolio={showAll}
+          showPortfolio={loadedPortfolios.length > 1}
           portfolios={portfolios}
         />
       </section>
