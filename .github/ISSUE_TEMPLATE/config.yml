@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 💡 Idea or feature discussion
+    url: https://github.com/gzManuel/pp-track/discussions/categories/ideas
+    about: Not sure it's a fully-formed feature yet? Start a discussion to gather feedback first.
+  - name: ❓ Question / help
+    url: https://github.com/gzManuel/pp-track/discussions/categories/q-a
+    about: Ask usage questions here instead of opening an issue.
+  - name: 🔒 Security or licensing
+    url: mailto:garistozm@outlook.com
+    about: Report security issues or ask about commercial licensing privately.

@@ -1,0 +1,72 @@
+name: ✨ Feature request
+description: Suggest a new feature or improvement for pp-track
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for suggesting an improvement! Please search [existing issues](https://github.com/issues?q=is%3Aissue) first to avoid duplicates.
+        For open-ended ideas you're not sure about yet, consider starting a [Discussion](../../discussions) instead.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem / motivation
+      description: What problem does this solve? What's the use case? "I'm always frustrated when…"
+      placeholder: When tracking multiple portfolios, I can't…
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+      description: Describe what you'd like to happen.
+      placeholder: Add a button that…
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Any other approaches or workarounds you've thought about.
+    validations:
+      required: false
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      description: Which part of the project does this affect?
+      multiple: true
+      options:
+        - web (Next.js frontend)
+        - server (Fastify API)
+        - ui (@repo/ui components)
+        - data model / Prisma schema
+        - prices / assets
+        - tooling / CI / build
+        - docs
+        - not sure
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Mockups, screenshots, links, or anything else that helps.
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Confirmations
+      options:
+        - label: I searched existing issues and this isn't a duplicate.
+          required: true
+        - label: I'd be willing to help implement this (optional).
+          required: false
