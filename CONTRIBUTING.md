@@ -74,5 +74,7 @@ vs. actual behavior, and your environment. For features, describe the use case.
 
 ## Questions
 
-For licensing or anything not covered here, reach the maintainer at
-**garistozm@outlook.com**.
+For usage questions or help, please use
+[GitHub Discussions](https://github.com/gzManuel/pp-track/discussions) (Q&A
+category) rather than opening an issue. For licensing, security, or anything not
+covered here, reach the maintainer at **garistozm@outlook.com**.
