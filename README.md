@@ -15,8 +15,8 @@ A portfolio tracking application. Track investments across multiple portfolios, 
 
 [Turborepo](https://turbo.build/) monorepo managed with `pnpm` workspaces.
 
-- **`apps/web`** — Next.js 16 frontend (React 19, Tailwind CSS v4, shadcn/ui, NextAuth)
-- **`apps/server`** — Fastify 5 backend with Prisma 7 + PostgreSQL
+- **[`apps/web`](./apps/web)** — Next.js 16 frontend (React 19, Tailwind CSS v4, shadcn/ui, NextAuth)
+- **[`apps/server`](./apps/server)** — Fastify 5 backend with Prisma 7 + PostgreSQL
 - **`packages/ui`** — Shared React component library (`@repo/ui`)
 - **`packages/eslint-config`** — Shared ESLint configs
 - **`packages/typescript-config`** — Shared `tsconfig.json` presets
@@ -35,8 +35,9 @@ The web app talks to the server over HTTP; requests are authenticated with a sha
 # 1. Install dependencies (from the repo root)
 pnpm install
 
-# 2. Configure environment variables (see below)
-#    apps/server/.env  and  apps/web/.env.local
+# 2. Configure environment variables (see each app's README)
+#    apps/server/.env       — see apps/server/README.md
+#    apps/web/.env.local     — see apps/web/README.md
 
 # 3. Apply database migrations and generate the Prisma client
 pnpm migrate
@@ -48,28 +49,10 @@ pnpm dev
 - Web app: http://localhost:3000
 - API server: http://localhost:3001
 
-## Environment variables
+For app-specific setup, scripts, environment variables, and layout, see the per-app docs:
 
-### `apps/server/.env`
-
-| Variable              | Description                                              |
-| --------------------- | -------------------------------------------------------- |
-| `DATABASE_URL`        | PostgreSQL connection string (driver-adapter mode)       |
-| `INTERNAL_API_SECRET` | Shared secret used to authenticate requests from the web |
-| `PORT`                | Server port (optional, defaults to `3001`)               |
-| `HOST`                | Bind host (optional, defaults to `0.0.0.0`)              |
-
-Prisma uses `@prisma/adapter-pg` (driver-adapter mode, not the default engine).
-
-### `apps/web/.env.local`
-
-| Variable                                | Description                                       |
-| --------------------------------------- | ------------------------------------------------- |
-| `SERVER_API_URL`                        | Base URL of the Fastify server (e.g. `http://localhost:3001`) |
-| `INTERNAL_API_SECRET`                   | Must match the server's value                     |
-| `NEXTAUTH_URL` / `NEXTAUTH_SECRET`      | NextAuth base URL and session secret              |
-| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`     | Google OAuth credentials                  |
-| `FACEBOOK_CLIENT_ID` / `FACEBOOK_CLIENT_SECRET` | Facebook OAuth credentials                |
+- [`apps/server/README.md`](./apps/server/README.md) — backend, Prisma, database backups
+- [`apps/web/README.md`](./apps/web/README.md) — frontend, OAuth
 
 ## Commands
 
@@ -86,27 +69,9 @@ pnpm format                       # prettier-format all TS/TSX/MD files
 pnpm migrate                      # run Prisma migrations against the dev database
 ```
 
-### Prisma (run from `apps/server`)
-
-```sh
-pnpm migrate                      # apply migrations and regenerate the client (dev)
-pnpm migrate:deploy               # apply migrations without prompting (production)
-pnpm prisma generate              # regenerate the client without migrating
-pnpm prisma studio                # open Prisma Studio
-```
-
 ## Data model
 
-Core models live in `apps/server/prisma/schema.prisma`:
-
-- **User** → many **Portfolio**, many **Watchlist**
-- **Portfolio** → many **Holding**, many **Transaction**
-- **Asset** — normalized asset registry (ticker + exchange unique); referenced by Holding, Transaction, PriceSnapshot, Watchlist
-- **Holding** — current position (quantity + average cost basis) per portfolio/asset pair
-- **Transaction** — individual buy/sell/fee records
-- **PriceSnapshot** — historical price records, indexed on `(assetId, recordedAt)`
-
-All monetary quantities use `Decimal(18,8)`; UUIDs are used for all primary keys.
+Core models live in [`apps/server/prisma/schema.prisma`](./apps/server/prisma/schema.prisma): **User**, **Portfolio**, **Asset**, **Holding**, **Transaction**, **PriceSnapshot**, and **Watchlist**. All monetary quantities use `Decimal(18,8)` and primary keys are UUIDs. See the [server README](./apps/server/README.md#data-model) for the relationships.
 
 ## License
 

@@ -8,6 +8,9 @@ node_modules
 # Personal data imports
 apps/server/scripts/*.csv
 
+# Database backups
+apps/server/backups/
+
 # Testing
 coverage
 
