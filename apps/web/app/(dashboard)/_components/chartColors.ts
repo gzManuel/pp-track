@@ -20,10 +20,5 @@ export const CHART_PALETTE = [
  */
 export function tickerColorMap(tickers: string[]): Record<string, string> {
   const unique = Array.from(new Set(tickers));
-  return Object.fromEntries(
-    unique.map((ticker, i) => [
-      ticker,
-      CHART_PALETTE[i % CHART_PALETTE.length] ?? "#64748b",
-    ])
-  );
+  return Object.fromEntries(unique.map((ticker, i) => [ticker, CHART_PALETTE[i % CHART_PALETTE.length] ?? "#64748b"]));
 }

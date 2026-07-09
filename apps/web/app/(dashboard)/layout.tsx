@@ -4,11 +4,7 @@ import { authOptions } from "@/lib/auth";
 import DashboardNav from "./_components/DashboardNav";
 import SignOutButton from "./_components/SignOutButton";
 
-export default async function DashboardLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const session = await getServerSession(authOptions);
   if (!session) redirect("/");
 

@@ -40,12 +40,12 @@ Direct Prisma access (e.g. `pnpm prisma studio`, `pnpm prisma generate`) works f
 
 Copy `.env.example` to `.env` and set:
 
-| Variable              | Description                                              |
-| --------------------- | -------------------------------------------------------- |
-| `DATABASE_URL`        | PostgreSQL connection string (driver-adapter mode)       |
+| Variable              | Description                                                                      |
+| --------------------- | -------------------------------------------------------------------------------- |
+| `DATABASE_URL`        | PostgreSQL connection string (driver-adapter mode)                               |
 | `INTERNAL_API_SECRET` | Shared secret authenticating requests from the web app; must match the web value |
-| `PORT`                | Server port (optional, defaults to `3001`)               |
-| `HOST`                | Bind host (optional, defaults to `0.0.0.0`)              |
+| `PORT`                | Server port (optional, defaults to `3001`)                                       |
+| `HOST`                | Bind host (optional, defaults to `0.0.0.0`)                                      |
 
 ## Project layout
 

@@ -27,7 +27,9 @@ export default function CurrencyToggle() {
           variant={active === opt ? "default" : "ghost"}
           size="sm"
           className="h-7 px-3"
-          onClick={() => select(opt)}
+          onClick={() => {
+            select(opt);
+          }}
         >
           {opt}
         </Button>

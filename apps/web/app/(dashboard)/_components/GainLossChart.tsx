@@ -1,18 +1,8 @@
 "use client";
 
 import { Bar, BarChart, CartesianGrid, Cell, XAxis, YAxis } from "recharts";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/shadcn/Card";
-import {
-  ChartContainer,
-  ChartTooltip,
-  ChartTooltipContent,
-  type ChartConfig,
-} from "@/components/shadcn/Chart";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/shadcn/Card";
+import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/shadcn/Chart";
 import type { EnrichedHolding } from "../dashboard/page";
 
 const GAIN_COLOR = "#059669"; // emerald-600
@@ -33,12 +23,7 @@ const BASE_PALETTE = [
 
 function baseColorMap(tickers: string[]): Record<string, string> {
   const unique = Array.from(new Set(tickers));
-  return Object.fromEntries(
-    unique.map((ticker, i) => [
-      ticker,
-      BASE_PALETTE[i % BASE_PALETTE.length] ?? "#64748b",
-    ])
-  );
+  return Object.fromEntries(unique.map((ticker, i) => [ticker, BASE_PALETTE[i % BASE_PALETTE.length] ?? "#64748b"]));
 }
 
 interface ChartDatum {
@@ -63,24 +48,18 @@ function fmt(value: number, decimals = 2) {
   });
 }
 
-export default function GainLossChart({
-  holdings,
-  priceCurrency,
-}: {
-  holdings: EnrichedHolding[];
-  priceCurrency: string;
-}) {
+export default function GainLossChart({ holdings, priceCurrency }: { holdings: EnrichedHolding[]; priceCurrency: string }) {
   const colors = baseColorMap(holdings.map((h) => h.ticker));
   const data: ChartDatum[] = holdings
-    .filter((h) => h.gain !== null && h.marketValue !== null)
+    .filter((h): h is EnrichedHolding & { gain: number; marketValue: number } => h.gain !== null && h.marketValue !== null)
     .map((h) => {
-      const gain = h.gain as number;
+      const gain = h.gain;
       // Stack the cost foundation and the gain/loss cap so both render as
       // positive segments: for a gain the green cap sits above cost, for a
       // loss the red cap sits above market value (capping back up to cost).
       return {
         ticker: h.ticker,
-        base: Math.min(h.costBasis, h.marketValue as number),
+        base: Math.min(h.costBasis, h.marketValue),
         delta: Math.abs(gain),
         cost: h.costBasis,
         gain,
@@ -97,37 +76,24 @@ export default function GainLossChart({
       </CardHeader>
       <CardContent>
         {data.length === 0 ? (
-          <p className="py-12 text-center text-sm text-muted-foreground">
-            No data to chart yet.
-          </p>
+          <p className="py-12 text-center text-sm text-muted-foreground">No data to chart yet.</p>
         ) : (
-          <ChartContainer
-            config={chartConfig}
-            className="aspect-auto h-[280px] w-full"
-          >
+          <ChartContainer config={chartConfig} className="aspect-auto h-[280px] w-full">
             <BarChart data={data} margin={{ top: 8 }}>
               <CartesianGrid vertical={false} />
-              <XAxis
-                dataKey="ticker"
-                tickLine={false}
-                axisLine={false}
-                tickMargin={8}
-              />
+              <XAxis dataKey="ticker" tickLine={false} axisLine={false} tickMargin={8} />
               <YAxis tickLine={false} axisLine={false} width={56} />
               <ChartTooltip
                 content={
                   <ChartTooltipContent
                     formatter={(_value, name, item) => {
-                      const d = item?.payload as ChartDatum | undefined;
+                      const d = item.payload as ChartDatum | undefined;
                       if (!d) return null;
                       if (name === "base") {
                         return `Cost: ${fmt(d.cost)} ${priceCurrency}`;
                       }
                       const sign = d.gain >= 0 ? "+" : "";
-                      const pct =
-                        d.gainPct != null
-                          ? ` (${sign}${fmt(d.gainPct, 1)}%)`
-                          : "";
+                      const pct = d.gainPct != null ? ` (${sign}${fmt(d.gainPct, 1)}%)` : "";
                       return `Gain / Loss: ${sign}${fmt(d.gain)} ${priceCurrency}${pct}`;
                     }}
                   />
@@ -140,10 +106,7 @@ export default function GainLossChart({
               </Bar>
               <Bar dataKey="delta" stackId="a" radius={[4, 4, 0, 0]}>
                 {data.map((d) => (
-                  <Cell
-                    key={d.ticker}
-                    fill={d.isGain ? GAIN_COLOR : LOSS_COLOR}
-                  />
+                  <Cell key={d.ticker} fill={d.isGain ? GAIN_COLOR : LOSS_COLOR} />
                 ))}
               </Bar>
             </BarChart>

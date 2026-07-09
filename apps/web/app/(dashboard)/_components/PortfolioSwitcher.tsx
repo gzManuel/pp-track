@@ -4,20 +4,8 @@ import { useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Check, ChevronsUpDown } from "lucide-react";
 import { Button } from "@/components/shadcn/Button";
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-  CommandSeparator,
-} from "@/components/shadcn/Command";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/shadcn/Popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator } from "@/components/shadcn/Command";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/shadcn/Popover";
 import { cn } from "@/lib/utils";
 
 function CheckBox({ checked }: { checked: boolean }) {
@@ -25,9 +13,7 @@ function CheckBox({ checked }: { checked: boolean }) {
     <span
       className={cn(
         "mr-2 flex size-4 items-center justify-center rounded-sm border border-primary",
-        checked
-          ? "bg-primary text-primary-foreground"
-          : "opacity-50 [&_svg]:invisible"
+        checked ? "bg-primary text-primary-foreground" : "opacity-50 [&_svg]:invisible",
       )}
     >
       <Check className="size-3" />
@@ -65,9 +51,7 @@ export default function PortfolioSwitcher({
 
   function toggle(id: string) {
     const current = allSelected ? portfolios.map((p) => p.id) : selectedIds;
-    const nextIds = current.includes(id)
-      ? current.filter((x) => x !== id)
-      : [...current, id];
+    const nextIds = current.includes(id) ? current.filter((x) => x !== id) : [...current, id];
     pushIds(nextIds);
   }
 
@@ -79,23 +63,15 @@ export default function PortfolioSwitcher({
     if (allSelected) return "All Portfolios";
     if (selectedIds.length === 0) return "No portfolios";
     if (selectedIds.length === 1) {
-      return (
-        portfolios.find((p) => p.id === selectedIds[0])?.name ?? "1 portfolio"
-      );
+      return portfolios.find((p) => p.id === selectedIds[0])?.name ?? "1 portfolio";
     }
-    return `${selectedIds.length} portfolios`;
+    return `${String(selectedIds.length)} portfolios`;
   }
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button
-          variant="outline"
-          size="lg"
-          role="combobox"
-          aria-expanded={open}
-          className="w-44 justify-between font-normal"
-        >
+        <Button variant="outline" size="lg" role="combobox" aria-expanded={open} className="w-44 justify-between font-normal">
           <span className="truncate">{triggerLabel()}</span>
           <ChevronsUpDown className="ml-2 size-4 shrink-0 opacity-50" />
         </Button>
@@ -117,7 +93,9 @@ export default function PortfolioSwitcher({
                 <CommandItem
                   key={p.id}
                   value={p.name}
-                  onSelect={() => toggle(p.id)}
+                  onSelect={() => {
+                    toggle(p.id);
+                  }}
                 >
                   <CheckBox checked={allSelected || selectedIds.includes(p.id)} />
                   {p.name}

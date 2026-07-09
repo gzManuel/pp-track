@@ -1,14 +1,7 @@
 "use client";
 
 import { Badge } from "@/components/shadcn/Badge";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/shadcn/Table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/shadcn/Table";
 import DeleteTransactionButton from "./DeleteTransactionButton";
 import EditTransactionDialog from "./EditTransactionDialog";
 
@@ -36,11 +29,7 @@ export default function TransactionsTable({
   portfolios: { id: string; name: string }[];
 }) {
   if (transactions.length === 0) {
-    return (
-      <p className="py-12 text-center text-sm text-muted-foreground">
-        No transactions yet. Log your first one to get started.
-      </p>
-    );
+    return <p className="py-12 text-center text-sm text-muted-foreground">No transactions yet. Log your first one to get started.</p>;
   }
 
   return (
@@ -63,42 +52,24 @@ export default function TransactionsTable({
       <TableBody>
         {transactions.map((tx) => (
           <TableRow key={tx.id}>
-            <TableCell className="text-sm text-muted-foreground">
-              {new Date(tx.transactedAt).toLocaleDateString()}
-            </TableCell>
-            {showPortfolio && (
-              <TableCell className="text-sm text-muted-foreground">
-                {tx.portfolioName}
-              </TableCell>
-            )}
-            <TableCell className="font-mono font-medium">
-              {tx.asset.ticker}
-            </TableCell>
+            <TableCell className="text-sm text-muted-foreground">{new Date(tx.transactedAt).toLocaleDateString()}</TableCell>
+            {showPortfolio && <TableCell className="text-sm text-muted-foreground">{tx.portfolioName}</TableCell>}
+            <TableCell className="font-mono font-medium">{tx.asset.ticker}</TableCell>
             <TableCell>
-              <Badge variant={tx.type === "BUY" ? "default" : "secondary"}>
-                {tx.type}
-              </Badge>
+              <Badge variant={tx.type === "BUY" ? "default" : "secondary"}>{tx.type}</Badge>
             </TableCell>
-            <TableCell className="text-right font-mono">
-              {Number(tx.quantity).toFixed(4)}
-            </TableCell>
-            <TableCell className="text-right font-mono">
-              {Number(tx.price).toFixed(2)}
-            </TableCell>
+            <TableCell className="text-right font-mono">{Number(tx.quantity).toFixed(4)}</TableCell>
+            <TableCell className="text-right font-mono">{Number(tx.price).toFixed(2)}</TableCell>
             <TableCell>{tx.currency}</TableCell>
             <TableCell className="text-right font-mono text-muted-foreground">
               {Number(tx.fee) > 0 ? Number(tx.fee).toFixed(2) : "—"}
             </TableCell>
             <TableCell className="text-right font-mono font-medium">
-              {(
-                Number(tx.quantity) * Number(tx.price) +
-                (tx.type === "BUY" ? Number(tx.fee) : -Number(tx.fee))
-              ).toFixed(2)}{" "}
+              {(Number(tx.quantity) * Number(tx.price) + (tx.type === "BUY" ? Number(tx.fee) : -Number(tx.fee))).toFixed(2)}{" "}
               <span className="text-muted-foreground">{tx.currency}</span>
             </TableCell>
-            <TableCell className="max-w-xs truncate text-sm text-muted-foreground">
-              {tx.notes || "—"}
-            </TableCell>
+            {/* Length check (not `?? "—"`) so empty-string notes also fall back to the dash. */}
+            <TableCell className="max-w-xs truncate text-sm text-muted-foreground">{tx.notes?.length ? tx.notes : "—"}</TableCell>
             <TableCell className="text-right">
               <div className="flex items-center justify-end gap-1">
                 <EditTransactionDialog

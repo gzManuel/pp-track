@@ -19,19 +19,16 @@ declare module "fastify" {
 export default fp(async (app) => {
   app.decorateRequest("userId", "");
 
-  app.decorate(
-    "authenticate",
-    async (request: FastifyRequest, reply: FastifyReply) => {
-      const secret = request.headers["x-internal-secret"];
-      const rawUserId = request.headers["x-user-id"];
-      const userId = Array.isArray(rawUserId) ? rawUserId[0] : rawUserId;
+  app.decorate("authenticate", async (request: FastifyRequest, reply: FastifyReply) => {
+    const secret = request.headers["x-internal-secret"];
+    const rawUserId = request.headers["x-user-id"];
+    const userId = Array.isArray(rawUserId) ? rawUserId[0] : rawUserId;
 
-      if (secret !== process.env.INTERNAL_API_SECRET || !userId) {
-        reply.status(401).send({ error: "Unauthorized" });
-        return;
-      }
-
-      request.userId = userId;
+    if (secret !== process.env.INTERNAL_API_SECRET || !userId) {
+      reply.status(401).send({ error: "Unauthorized" });
+      return;
     }
-  );
+
+    request.userId = userId;
+  });
 });

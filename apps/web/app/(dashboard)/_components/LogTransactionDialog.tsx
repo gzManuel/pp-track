@@ -3,13 +3,7 @@
 import { useState } from "react";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/shadcn/Button";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/shadcn/Dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/shadcn/Dialog";
 import LogTransactionForm from "./LogTransactionForm";
 
 export default function LogTransactionDialog({
@@ -36,7 +30,9 @@ export default function LogTransactionDialog({
         <LogTransactionForm
           portfolios={portfolios}
           defaultPortfolioId={defaultPortfolioId}
-          onSuccess={() => setOpen(false)}
+          onSuccess={() => {
+            setOpen(false);
+          }}
         />
       </DialogContent>
     </Dialog>

@@ -129,10 +129,10 @@ of this Agreement to **garistozm@outlook.com**. Include your full legal name,
 GitHub username, and email.
 
 | Full name | GitHub username | Date (YYYY-MM-DD) |
-|-----------|-----------------|-------------------|
+| --------- | --------------- | ----------------- |
 |           |                 |                   |
 
 ---
 
-*By submitting a Contribution to the Project, You acknowledge that You have read
-and agree to the terms of this Agreement.*
+_By submitting a Contribution to the Project, You acknowledge that You have read
+and agree to the terms of this Agreement._

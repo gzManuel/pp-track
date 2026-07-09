@@ -2,55 +2,43 @@
 
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { serverFetch } from "@/lib/server-api";
 
-const serverUrl = process.env.SERVER_API_URL ?? "http://localhost:3001";
+const JSON_HEADERS = { "Content-Type": "application/json" };
 
-function authHeaders(userId: string) {
-  return {
-    "Content-Type": "application/json",
-    "x-internal-secret": process.env.INTERNAL_API_SECRET!,
-    "x-user-id": userId,
-  };
-}
-
-export type TickerSearchResult = {
+export interface TickerSearchResult {
   symbol: string;
   name: string;
   exchange: string | null;
   type: string;
   source: "portfolio" | "yahoo";
-};
+}
 
-export async function searchTickers(
-  query: string,
-): Promise<TickerSearchResult[]> {
+export async function searchTickers(query: string): Promise<TickerSearchResult[]> {
   const q = query.trim();
   if (!q) return [];
 
   const session = await getServerSession(authOptions);
   if (!session) throw new Error("Unauthorized");
 
-  const res = await fetch(
-    `${serverUrl}/api/assets/search?q=${encodeURIComponent(q)}`,
-    { headers: authHeaders(session.user.id) },
-  );
+  const res = await serverFetch(`/api/assets/search?q=${encodeURIComponent(q)}`, { userId: session.user.id });
 
   if (!res.ok) throw new Error("Failed to search tickers");
-  return res.json();
+  return (await res.json()) as TickerSearchResult[];
 }
 
 export async function createPortfolio(name: string) {
   const session = await getServerSession(authOptions);
   if (!session) throw new Error("Unauthorized");
 
-  const res = await fetch(`${serverUrl}/api/portfolios`, {
+  const res = await serverFetch(`/api/portfolios`, {
     method: "POST",
-    headers: authHeaders(session.user.id),
+    headers: JSON_HEADERS,
     body: JSON.stringify({ name }),
+    userId: session.user.id,
   });
 
   if (!res.ok) throw new Error("Failed to create portfolio");
-  return res.json();
 }
 
 export async function logTransaction(
@@ -69,17 +57,14 @@ export async function logTransaction(
   const session = await getServerSession(authOptions);
   if (!session) throw new Error("Unauthorized");
 
-  const res = await fetch(
-    `${serverUrl}/api/portfolios/${portfolioId}/transactions`,
-    {
-      method: "POST",
-      headers: authHeaders(session.user.id),
-      body: JSON.stringify(data),
-    },
-  );
+  const res = await serverFetch(`/api/portfolios/${portfolioId}/transactions`, {
+    method: "POST",
+    headers: JSON_HEADERS,
+    body: JSON.stringify(data),
+    userId: session.user.id,
+  });
 
   if (!res.ok) throw new Error("Failed to log transaction");
-  return res.json();
 }
 
 export async function updateTransaction(
@@ -100,34 +85,25 @@ export async function updateTransaction(
   const session = await getServerSession(authOptions);
   if (!session) throw new Error("Unauthorized");
 
-  const res = await fetch(
-    `${serverUrl}/api/portfolios/${portfolioId}/transactions/${txId}`,
-    {
-      method: "PATCH",
-      headers: authHeaders(session.user.id),
-      body: JSON.stringify(data),
-    },
-  );
+  const res = await serverFetch(`/api/portfolios/${portfolioId}/transactions/${txId}`, {
+    method: "PATCH",
+    headers: JSON_HEADERS,
+    body: JSON.stringify(data),
+    userId: session.user.id,
+  });
 
   if (!res.ok) throw new Error("Failed to update transaction");
-  return res.json();
 }
 
 export async function deleteTransaction(portfolioId: string, txId: string) {
   const session = await getServerSession(authOptions);
   if (!session) throw new Error("Unauthorized");
 
-  const res = await fetch(
-    `${serverUrl}/api/portfolios/${portfolioId}/transactions/${txId}`,
-    {
-      method: "DELETE",
-      // No JSON body on delete — omit Content-Type so Fastify doesn't reject an empty body.
-      headers: {
-        "x-internal-secret": process.env.INTERNAL_API_SECRET!,
-        "x-user-id": session.user.id,
-      },
-    },
-  );
+  // No JSON body on delete — omit Content-Type so Fastify doesn't reject an empty body.
+  const res = await serverFetch(`/api/portfolios/${portfolioId}/transactions/${txId}`, {
+    method: "DELETE",
+    userId: session.user.id,
+  });
 
   if (!res.ok) throw new Error("Failed to delete transaction");
 }

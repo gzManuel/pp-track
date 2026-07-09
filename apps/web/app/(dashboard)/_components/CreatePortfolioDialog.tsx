@@ -3,13 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/shadcn/Button";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/shadcn/Dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/shadcn/Dialog";
 import { Input } from "@/components/shadcn/Input";
 import { Label } from "@/components/shadcn/Label";
 import { createPortfolio } from "../actions";
@@ -48,7 +42,10 @@ export default function CreatePortfolioDialog() {
               id="portfolio-name"
               placeholder="e.g. My Portfolio"
               value={name}
-              onChange={(e) => setName(e.target.value)}
+              onChange={(e) => {
+                setName(e.target.value);
+              }}
+              // eslint-disable-next-line jsx-a11y/no-autofocus -- dialog input should focus on open
               autoFocus
             />
           </div>

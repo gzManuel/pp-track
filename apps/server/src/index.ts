@@ -1,9 +1,6 @@
 import "dotenv/config";
 import Fastify from "fastify";
-import {
-  serializerCompiler,
-  validatorCompiler,
-} from "fastify-type-provider-zod";
+import { serializerCompiler, validatorCompiler } from "fastify-type-provider-zod";
 import prismaPlugin from "./plugins/prisma.js";
 import authPlugin from "./plugins/auth.js";
 import pricesRoutes from "./routes/prices.js";
@@ -35,10 +32,11 @@ app.get("/health", async () => {
   }
 });
 
-process.on("SIGINT", async () => {
+process.on("SIGINT", () => {
   // app.close() fires the onClose hook that disconnects Prisma.
-  await app.close();
-  process.exit();
+  void app.close().finally(() => {
+    process.exit();
+  });
 });
 
 const port = Number(process.env.PORT ?? 3001);

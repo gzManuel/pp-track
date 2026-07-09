@@ -36,13 +36,13 @@ pnpm check-types    # next typegen + tsc --noEmit
 
 Copy `.env.example` to `.env.local` and set:
 
-| Variable                                        | Description                                   |
-| ----------------------------------------------- | --------------------------------------------- |
+| Variable                                        | Description                                                   |
+| ----------------------------------------------- | ------------------------------------------------------------- |
 | `SERVER_API_URL`                                | Base URL of the Fastify server (e.g. `http://localhost:3001`) |
-| `INTERNAL_API_SECRET`                           | Shared secret; must match the server's value  |
-| `NEXTAUTH_URL` / `NEXTAUTH_SECRET`              | NextAuth base URL and session secret          |
-| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`     | Google OAuth credentials                      |
-| `FACEBOOK_CLIENT_ID` / `FACEBOOK_CLIENT_SECRET` | Facebook OAuth credentials                    |
+| `INTERNAL_API_SECRET`                           | Shared secret; must match the server's value                  |
+| `NEXTAUTH_URL` / `NEXTAUTH_SECRET`              | NextAuth base URL and session secret                          |
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`     | Google OAuth credentials                                      |
+| `FACEBOOK_CLIENT_ID` / `FACEBOOK_CLIENT_SECRET` | Facebook OAuth credentials                                    |
 
 ## Project layout
 

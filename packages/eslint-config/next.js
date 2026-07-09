@@ -1,46 +1,42 @@
-import js from "@eslint/js";
-import { FlatCompat } from "@eslint/eslintrc";
-import { globalIgnores } from "eslint/config";
 import eslintConfigPrettier from "eslint-config-prettier";
-import tseslint from "typescript-eslint";
 import pluginReactHooks from "eslint-plugin-react-hooks";
 import pluginReact from "eslint-plugin-react";
-import globals from "globals";
+import pluginA11y from "eslint-plugin-jsx-a11y";
 import pluginNext from "@next/eslint-plugin-next";
-import { fileURLToPath } from "url";
-import path from "path";
+import globals from "globals";
 import { config as baseConfig } from "./base.js";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-const compat = new FlatCompat({ baseDirectory: __dirname });
-
 /**
- * A custom ESLint configuration for libraries that use Next.js.
+ * ESLint configuration for the Next.js frontend.
+ *
+ * Extends the shared base (JS + typescript-eslint `recommended`) with the
+ * React, React Hooks, jsx-a11y, and Next.js plugin rule sets. Type-aware
+ * linting is intentionally left off here to keep linting fast.
  *
  * @type {import("eslint").Linter.Config[]}
  * */
 export const nextJsConfig = [
   ...baseConfig,
-  js.configs.recommended,
-  eslintConfigPrettier,
-  ...tseslint.configs.recommended,
-  ...compat.extends("airbnb"),
-  eslintConfigPrettier,
-  globalIgnores([
-    ".next/**",
-    "out/**",
-    "build/**",
-    "next-env.d.ts",
-  ]),
   {
     ...pluginReact.configs.flat.recommended,
     languageOptions: {
       ...pluginReact.configs.flat.recommended.languageOptions,
       globals: {
+        ...globals.browser,
         ...globals.serviceworker,
       },
+    },
+    settings: { react: { version: "detect" } },
+  },
+  // Automatic JSX runtime (Next.js): drop the old `import React` requirement.
+  // Disables react/react-in-jsx-scope and react/jsx-uses-react.
+  pluginReact.configs.flat["jsx-runtime"],
+  {
+    plugins: {
+      "jsx-a11y": pluginA11y,
+    },
+    rules: {
+      ...pluginA11y.configs.recommended.rules,
     },
   },
   {
@@ -56,18 +52,13 @@ export const nextJsConfig = [
     plugins: {
       "react-hooks": pluginReactHooks,
     },
-    settings: { react: { version: "detect" } },
     rules: {
       ...pluginReactHooks.configs.recommended.rules,
-      "react/react-in-jsx-scope": "off",
-      // TypeScript provides prop type safety; prop-types are redundant
-      "react/prop-types": "off",
-      "react/require-default-props": "off",
-      // Allow JSX in .tsx files
-      "react/jsx-filename-extension": ["warn", { extensions: [".tsx", ".jsx"] }],
-      // airbnb re-enables these; TypeScript handles both
-      "import/extensions": "off",
-      "import/no-unresolved": "off",
     },
+  },
+  // Keep Prettier last so it wins any formatting-rule conflicts.
+  eslintConfigPrettier,
+  {
+    ignores: [".next/**", "out/**", "build/**", "next-env.d.ts"],
   },
 ];

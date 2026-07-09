@@ -1,14 +1,6 @@
 "use client";
 
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableFooter,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/shadcn/Table";
+import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/shadcn/Table";
 import type { EnrichedHolding } from "../dashboard/page";
 
 function fmt(value: number, decimals = 2) {
@@ -31,27 +23,21 @@ function GainCell({ value, pct }: { value: number | null; pct?: number | null })
   const sign = positive ? "+" : "";
   return (
     <TableCell className={`text-right font-mono ${color}`}>
-      {sign}{fmt(value)}
+      {sign}
+      {fmt(value)}
       {pct !== undefined && pct !== null && (
-        <span className="ml-1 text-xs opacity-75">({sign}{fmt(pct, 1)}%)</span>
+        <span className="ml-1 text-xs opacity-75">
+          ({sign}
+          {fmt(pct, 1)}%)
+        </span>
       )}
     </TableCell>
   );
 }
 
-export default function HoldingsTable({
-  holdings,
-  priceCurrency = "USD",
-}: {
-  holdings: EnrichedHolding[];
-  priceCurrency?: string;
-}) {
+export default function HoldingsTable({ holdings, priceCurrency = "USD" }: { holdings: EnrichedHolding[]; priceCurrency?: string }) {
   if (holdings.length === 0) {
-    return (
-      <p className="py-12 text-center text-sm text-muted-foreground">
-        No positions yet. Log a transaction to get started.
-      </p>
-    );
+    return <p className="py-12 text-center text-sm text-muted-foreground">No positions yet. Log a transaction to get started.</p>;
   }
 
   const totalMarketValue = holdings.reduce((s, h) => s + (h.marketValue ?? 0), 0);
@@ -97,12 +83,18 @@ export default function HoldingsTable({
       </TableBody>
       <TableFooter>
         <TableRow>
-          <TableCell colSpan={5} className="font-semibold">Total</TableCell>
+          <TableCell colSpan={5} className="font-semibold">
+            Total
+          </TableCell>
           <TableCell className="text-right font-mono font-semibold">{fmt(totalMarketValue)}</TableCell>
           <TableCell className={`text-right font-mono font-semibold ${totalGainColor}`}>
-            {totalGainSign}{fmt(totalGain)}
+            {totalGainSign}
+            {fmt(totalGain)}
             {totalGainPct !== null && (
-              <span className="ml-1 text-xs opacity-75">({totalGainSign}{fmt(totalGainPct, 1)}%)</span>
+              <span className="ml-1 text-xs opacity-75">
+                ({totalGainSign}
+                {fmt(totalGainPct, 1)}%)
+              </span>
             )}
           </TableCell>
           <TableCell className="text-right font-mono font-semibold">100%</TableCell>

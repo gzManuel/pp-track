@@ -16,15 +16,7 @@ import {
 } from "@/components/shadcn/Dialog";
 import { deleteTransaction } from "../actions";
 
-export default function DeleteTransactionButton({
-  portfolioId,
-  txId,
-  label,
-}: {
-  portfolioId: string;
-  txId: string;
-  label: string;
-}) {
+export default function DeleteTransactionButton({ portfolioId, txId, label }: { portfolioId: string; txId: string; label: string }) {
   const [open, setOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
@@ -53,8 +45,7 @@ export default function DeleteTransactionButton({
         <DialogHeader>
           <DialogTitle>Delete transaction?</DialogTitle>
           <DialogDescription>
-            This permanently deletes {label} and recalculates your holdings
-            (quantity and average cost). This action cannot be undone.
+            This permanently deletes {label} and recalculates your holdings (quantity and average cost). This action cannot be undone.
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>

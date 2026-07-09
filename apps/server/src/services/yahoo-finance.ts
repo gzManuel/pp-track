@@ -49,37 +49,44 @@ export async function searchSymbols(query: string): Promise<SymbolSearchResult[]
   // which rejects otherwise-valid ETF/equity quotes when Yahoo's response shape
   // drifts ahead of the installed library version.
   const result = (await yf.search(query, { newsCount: 0 }, { validateResult: false })) as {
-    quotes?: Array<Record<string, unknown>>;
+    quotes?: Record<string, unknown>[];
   };
 
   return (result.quotes ?? [])
-    .filter(
-      (q) =>
-        q.isYahooFinance === true &&
-        typeof q.quoteType === "string" &&
-        SEARCHABLE_TYPES.has(q.quoteType)
-    )
+    .filter((q) => q.isYahooFinance === true && typeof q.quoteType === "string" && SEARCHABLE_TYPES.has(q.quoteType))
     .map((q) => ({
       symbol: String(q.symbol),
       name: String(q.longname ?? q.shortname ?? q.symbol),
-      exchange: q.exchange != null ? String(q.exchange) : null,
+      exchange: typeof q.exchange === "string" ? q.exchange : null,
       type: String(q.quoteType),
     }));
 }
 
 export async function fetchQuote(symbol: string): Promise<QuoteResult> {
-  const quote = await yf.quote(symbol);
+  // yahoo-finance2's Quote type is a loose union whose fields resolve to `any`;
+  // pin the shape we consume at this boundary so callers get real types.
+  const quote = (await yf.quote(symbol)) as unknown as
+    | {
+        symbol?: string;
+        regularMarketPrice?: number | null;
+        currency?: string;
+        longName?: string;
+        shortName?: string;
+        quoteType?: string;
+        exchange?: string;
+      }
+    | undefined;
 
   if (!quote) {
     throw new Error(`Symbol not found: ${symbol}`);
   }
 
-  if (quote.regularMarketPrice === undefined || quote.regularMarketPrice === null) {
+  if (quote.regularMarketPrice == null) {
     throw new Error(`No price available for ${symbol}`);
   }
 
   return {
-    symbol: quote.symbol,
+    symbol: quote.symbol ?? symbol,
     price: quote.regularMarketPrice,
     currency: quote.currency ?? "USD",
     name: quote.longName ?? quote.shortName ?? symbol,

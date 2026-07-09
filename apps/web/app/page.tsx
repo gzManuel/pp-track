@@ -11,9 +11,7 @@ export default async function Home() {
     <main className="flex min-h-screen flex-col items-center justify-center gap-6 p-8">
       <div className="flex flex-col items-center gap-2 text-center">
         <h1 className="text-3xl font-bold tracking-tight">pp-track</h1>
-        <p className="text-muted-foreground">
-          Track your stock portfolio across USD and ARS.
-        </p>
+        <p className="text-muted-foreground">Track your stock portfolio across USD and ARS.</p>
       </div>
       <SignInButton />
     </main>

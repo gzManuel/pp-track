@@ -24,7 +24,7 @@ function toUtcDateStr(d: Date): string {
   const y = d.getUTCFullYear();
   const m = String(d.getUTCMonth() + 1).padStart(2, "0");
   const day = String(d.getUTCDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
+  return `${String(y)}-${m}-${day}`;
 }
 
 /** Most recent published MEP rate on or before `at`, or null if unavailable. */
@@ -37,10 +37,10 @@ async function mepOnOrBefore(at: Date): Promise<number | null> {
     const cutoff = toUtcDateStr(at);
     // Keep entries dated on or before `at`, then take the latest — mirrors the
     // "on or before" rule and naturally skips weekends/holidays with no entry.
-    const eligible = series.filter((q) => q.fecha && q.fecha <= cutoff);
+    const eligible = series.filter((q): q is DolarQuote & { fecha: string } => q.fecha != null && q.fecha <= cutoff);
     if (eligible.length === 0) return null;
 
-    const latest = eligible.reduce((a, b) => (a.fecha! >= b.fecha! ? a : b));
+    const latest = eligible.reduce((a, b) => (a.fecha >= b.fecha ? a : b));
     return midRate(latest);
   } catch {
     return null;
@@ -51,7 +51,7 @@ async function mepOnOrBefore(at: Date): Promise<number | null> {
 async function currentMep(): Promise<number> {
   const res = await fetch(`${DOLAR_API_BASE}/v1/dolares/bolsa`);
   if (!res.ok) {
-    throw new Error(`Failed to fetch current MEP rate: ${res.status}`);
+    throw new Error(`Failed to fetch current MEP rate: ${String(res.status)}`);
   }
   return midRate((await res.json()) as DolarQuote);
 }

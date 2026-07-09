@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { getUserId } from "@/lib/auth";
+import { serverBaseUrl, serverFetch } from "@/lib/server-api";
 import CreatePortfolioDialog from "../_components/CreatePortfolioDialog";
 
 interface Portfolio {
@@ -24,35 +24,15 @@ interface PortfolioSummary {
   gainPct: number | null;
 }
 
-function serverFetch(url: string, userId: string) {
-  return fetch(url, {
-    headers: {
-      "x-internal-secret": process.env.INTERNAL_API_SECRET!,
-      "x-user-id": userId,
-    },
-    cache: "no-store",
-  });
-}
-
-async function getSummary(
-  serverUrl: string,
-  userId: string,
-  portfolioId: string
-): Promise<PortfolioSummary> {
-  const holdingsRes = await serverFetch(
-    `${serverUrl}/api/portfolios/${portfolioId}/holdings`,
-    userId
-  );
-  const rawHoldings: RawHolding[] = await holdingsRes.json();
+async function getSummary(userId: string, portfolioId: string): Promise<PortfolioSummary> {
+  const holdingsRes = await serverFetch(`/api/portfolios/${portfolioId}/holdings`, { userId });
+  const rawHoldings = (await holdingsRes.json()) as RawHolding[];
 
   const tickers = rawHoldings.map((h) => h.asset.ticker).join(",");
   const priceMap: Record<string, number> = {};
   if (tickers) {
-    const pricesRes = await fetch(
-      `${serverUrl}/api/prices?tickers=${encodeURIComponent(tickers)}`,
-      { cache: "no-store" }
-    );
-    const prices: { ticker: string; price?: string }[] = await pricesRes.json();
+    const pricesRes = await fetch(`${serverBaseUrl()}/api/prices?tickers=${encodeURIComponent(tickers)}`, { cache: "no-store" });
+    const prices = (await pricesRes.json()) as { ticker: string; price?: string }[];
     prices
       .filter((p) => p.price)
       .forEach((p) => {
@@ -85,16 +65,12 @@ function fmt(value: number) {
 }
 
 export default async function PortfoliosPage() {
-  const session = await getServerSession(authOptions);
-  const userId = session!.user.id;
-  const serverUrl = process.env.SERVER_API_URL ?? "http://localhost:3001";
+  const userId = await getUserId();
 
-  const res = await serverFetch(`${serverUrl}/api/portfolios`, userId);
-  const portfolios: Portfolio[] = await res.json();
+  const res = await serverFetch("/api/portfolios", { userId });
+  const portfolios = (await res.json()) as Portfolio[];
 
-  const summaries = await Promise.all(
-    portfolios.map((p) => getSummary(serverUrl, userId, p.id))
-  );
+  const cards = await Promise.all(portfolios.map(async (p) => ({ portfolio: p, summary: await getSummary(userId, p.id) })));
 
   return (
     <>
@@ -104,13 +80,10 @@ export default async function PortfoliosPage() {
       </div>
 
       {portfolios.length === 0 ? (
-        <p className="py-20 text-center text-sm text-muted-foreground">
-          No portfolios yet. Create one to get started.
-        </p>
+        <p className="py-20 text-center text-sm text-muted-foreground">No portfolios yet. Create one to get started.</p>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {portfolios.map((p, i) => {
-            const summary = summaries[i]!;
+          {cards.map(({ portfolio: p, summary }) => {
             const positive = summary.gain >= 0;
             return (
               <Link
@@ -121,15 +94,9 @@ export default async function PortfoliosPage() {
                 <div className="flex flex-col gap-1">
                   <div className="flex items-center justify-between">
                     <span className="font-semibold">{p.name}</span>
-                    {p.isDefault && (
-                      <span className="text-xs text-muted-foreground border rounded-full px-2 py-0.5">
-                        Default
-                      </span>
-                    )}
+                    {p.isDefault && <span className="text-xs text-muted-foreground border rounded-full px-2 py-0.5">Default</span>}
                   </div>
-                  <span className="text-sm text-muted-foreground">
-                    {p.currency}
-                  </span>
+                  <span className="text-sm text-muted-foreground">{p.currency}</span>
                 </div>
 
                 <dl className="flex flex-col gap-1.5 text-sm">
@@ -143,9 +110,7 @@ export default async function PortfoliosPage() {
                   </div>
                   <div className="flex items-center justify-between">
                     <dt className="text-muted-foreground">Gain/Loss</dt>
-                    <dd
-                      className={`font-mono ${positive ? "text-emerald-600" : "text-red-500"}`}
-                    >
+                    <dd className={`font-mono ${positive ? "text-emerald-600" : "text-red-500"}`}>
                       {positive ? "+" : ""}
                       {fmt(summary.gain)}
                       {summary.gainPct !== null && (

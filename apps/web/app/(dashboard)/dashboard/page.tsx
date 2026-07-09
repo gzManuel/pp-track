@@ -1,5 +1,5 @@
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { getUserId } from "@/lib/auth";
+import { serverBaseUrl, serverFetch } from "@/lib/server-api";
 import AllocationChart from "../_components/AllocationChart";
 import CreatePortfolioDialog from "../_components/CreatePortfolioDialog";
 import CurrencyToggle from "../_components/CurrencyToggle";
@@ -39,42 +39,22 @@ interface Portfolio {
   currency: string;
 }
 
-function serverFetch(url: string, userId: string) {
-  return fetch(url, {
-    headers: {
-      "x-internal-secret": process.env.INTERNAL_API_SECRET!,
-      "x-user-id": userId,
-    },
-    cache: "no-store",
-  });
-}
-
-export default async function DashboardPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ currency?: string; portfolio?: string }>;
-}) {
-  const session = await getServerSession(authOptions);
-  const userId = session!.user.id;
-  const serverUrl = process.env.SERVER_API_URL ?? "http://localhost:3001";
+export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ currency?: string; portfolio?: string }> }) {
+  const userId = await getUserId();
 
   const { currency, portfolio } = await searchParams;
   const ars = currency?.toUpperCase() === "ARS";
 
-  const portfoliosRes = await serverFetch(`${serverUrl}/api/portfolios`, userId);
-  const portfolios: Portfolio[] = await portfoliosRes.json();
+  const portfoliosRes = await serverFetch("/api/portfolios", { userId });
+  const portfolios = (await portfoliosRes.json()) as Portfolio[];
 
   // Resolve which portfolios to show. Absent param keeps the old default (the
   // default/first portfolio); "all" aggregates everything; "none" is an explicit
   // empty selection; a comma list selects a subset.
   const showAll = portfolio === "all";
   const explicitNone = portfolio === "none";
-  const ids =
-    portfolio && portfolio !== "all" && portfolio !== "none"
-      ? portfolio.split(",").filter(Boolean)
-      : [];
-  const defaultPortfolio =
-    portfolios.find((p) => p.isDefault) ?? portfolios[0];
+  const ids = portfolio && portfolio !== "all" && portfolio !== "none" ? portfolio.split(",").filter(Boolean) : [];
+  const defaultPortfolio = portfolios.find((p) => p.isDefault) ?? portfolios[0];
   let selectedPortfolios: Portfolio[];
   if (showAll) {
     selectedPortfolios = portfolios;
@@ -90,9 +70,7 @@ export default async function DashboardPage({
     return (
       <div className="flex flex-col items-center gap-3 py-20 text-center">
         <h1 className="text-xl font-semibold">No portfolio yet</h1>
-        <p className="text-sm text-muted-foreground">
-          Create one to start tracking your investments.
-        </p>
+        <p className="text-sm text-muted-foreground">Create one to start tracking your investments.</p>
         <CreatePortfolioDialog />
       </div>
     );
@@ -101,35 +79,25 @@ export default async function DashboardPage({
   const selectedIds = selectedPortfolios.map((p) => p.id);
   const allSelected = showAll || (!explicitNone && ids.length === 0);
 
-  if (selectedPortfolios.length === 0) {
+  const primaryPortfolio = selectedPortfolios[0];
+  if (!primaryPortfolio) {
     return (
       <>
         <div className="mb-6 flex items-center justify-between">
-          <PortfolioSwitcher
-            portfolios={portfolios}
-            selectedIds={selectedIds}
-            allSelected={allSelected}
-          />
+          <PortfolioSwitcher portfolios={portfolios} selectedIds={selectedIds} allSelected={allSelected} />
         </div>
         <p className="py-20 text-center text-sm text-muted-foreground">
-          No portfolios selected. Pick one from the switcher to see your
-          positions.
+          No portfolios selected. Pick one from the switcher to see your positions.
         </p>
       </>
     );
   }
 
-  const primaryPortfolio = selectedPortfolios[0]!;
-
   // The selected portfolios are aggregated; the same asset across portfolios is
   // merged into one row below.
   const loadedPortfolios = selectedPortfolios;
   const holdingsLists: RawHolding[][] = await Promise.all(
-    loadedPortfolios.map((p) =>
-      serverFetch(`${serverUrl}/api/portfolios/${p.id}/holdings`, userId).then(
-        (r) => r.json()
-      )
-    )
+    loadedPortfolios.map((p) => serverFetch(`/api/portfolios/${p.id}/holdings`, { userId }).then((r) => r.json() as Promise<RawHolding[]>)),
   );
   const rawHoldings: RawHolding[] = holdingsLists.flat();
 
@@ -171,11 +139,10 @@ export default async function DashboardPage({
   const tickers = positions.map((p) => p.ticker).join(",");
   const priceMap: Record<string, number> = {};
   if (tickers) {
-    const pricesRes = await fetch(
-      `${serverUrl}/api/prices?tickers=${encodeURIComponent(tickers)}${ars ? "&currency=ARS" : ""}`,
-      { cache: "no-store" }
-    );
-    const prices: { ticker: string; price?: string }[] = await pricesRes.json();
+    const pricesRes = await fetch(`${serverBaseUrl()}/api/prices?tickers=${encodeURIComponent(tickers)}${ars ? "&currency=ARS" : ""}`, {
+      cache: "no-store",
+    });
+    const prices = (await pricesRes.json()) as { ticker: string; price?: string }[];
     prices
       .filter((p) => p.price)
       .forEach((p) => {
@@ -206,44 +173,25 @@ export default async function DashboardPage({
     };
   });
 
-  const totalMarketValue = enrichedHoldings.reduce(
-    (sum, h) => sum + (h.marketValue ?? 0),
-    0
-  );
-  
+  const totalMarketValue = enrichedHoldings.reduce((sum, h) => sum + (h.marketValue ?? 0), 0);
+
   enrichedHoldings.forEach((h) => {
-    h.portfolioPct =
-      totalMarketValue > 0 && h.marketValue !== null
-        ? (h.marketValue / totalMarketValue) * 100
-        : null;
+    h.portfolioPct = totalMarketValue > 0 && h.marketValue !== null ? (h.marketValue / totalMarketValue) * 100 : null;
   });
 
   return (
     <>
       <div className="mb-6 flex items-center justify-between">
-        <PortfolioSwitcher
-          portfolios={portfolios}
-          selectedIds={selectedIds}
-          allSelected={allSelected}
-        />
+        <PortfolioSwitcher portfolios={portfolios} selectedIds={selectedIds} allSelected={allSelected} />
         <div className="flex items-center gap-2">
           <CurrencyToggle />
           <RefreshButton />
-          <LogTransactionDialog
-            portfolios={portfolios}
-            defaultPortfolioId={primaryPortfolio.id}
-          />
+          <LogTransactionDialog portfolios={portfolios} defaultPortfolioId={primaryPortfolio.id} />
         </div>
       </div>
       <section className="mb-10 grid gap-4 md:grid-cols-2">
-        <AllocationChart
-          holdings={enrichedHoldings}
-          priceCurrency={ars ? "ARS" : "USD"}
-        />
-        <GainLossChart
-          holdings={enrichedHoldings}
-          priceCurrency={ars ? "ARS" : "USD"}
-        />
+        <AllocationChart holdings={enrichedHoldings} priceCurrency={ars ? "ARS" : "USD"} />
+        <GainLossChart holdings={enrichedHoldings} priceCurrency={ars ? "ARS" : "USD"} />
       </section>
       <section className="mb-10">
         <h2 className="mb-3 text-lg font-medium">Positions</h2>

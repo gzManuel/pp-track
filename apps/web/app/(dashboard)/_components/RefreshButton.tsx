@@ -11,7 +11,9 @@ export default function RefreshButton() {
   function handleRefresh() {
     setSpinning(true);
     router.refresh();
-    setTimeout(() => setSpinning(false), 800);
+    setTimeout(() => {
+      setSpinning(false);
+    }, 800);
   }
 
   return (

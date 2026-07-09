@@ -1,11 +1,10 @@
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/shadcn/Table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/shadcn/Table";
+import { serverBaseUrl } from "@/lib/server-api";
+
+// Live prices are fetched per request (no-store); never prerender this route.
+// Rendering it at build time (NODE_ENV=production) would call serverBaseUrl(),
+// which requires SERVER_API_URL — unset during `next build` in CI.
+export const dynamic = "force-dynamic";
 
 const TICKERS = ["AAPL", "AAPLD.BA", "SPYDD.BA"];
 
@@ -19,14 +18,10 @@ interface PriceResult {
 }
 
 async function getPrices(): Promise<PriceResult[]> {
-  const serverUrl = process.env.SERVER_API_URL ?? "http://localhost:3001";
-  const res = await fetch(
-    `${serverUrl}/api/prices?tickers=${TICKERS.join(",")}`,
-    { cache: "no-store" }
-  );
+  const res = await fetch(`${serverBaseUrl()}/api/prices?tickers=${TICKERS.join(",")}`, { cache: "no-store" });
 
   if (!res.ok) throw new Error("Failed to fetch prices");
-  return res.json();
+  return (await res.json()) as PriceResult[];
 }
 
 export default async function PricesPage() {
@@ -49,16 +44,10 @@ export default async function PricesPage() {
           {prices.map((p) => (
             <TableRow key={p.ticker}>
               <TableCell className="font-mono font-medium">{p.ticker}</TableCell>
-              <TableCell className="text-right font-mono">
-                {p.error ? "—" : Number(p.price).toFixed(2)}
-              </TableCell>
+              <TableCell className="text-right font-mono">{p.error ? "—" : Number(p.price).toFixed(2)}</TableCell>
               <TableCell>{p.error ? "—" : p.currency}</TableCell>
-              <TableCell className="text-muted-foreground text-sm">
-                {p.error ? p.error : new Date(p.recordedAt).toLocaleTimeString()}
-              </TableCell>
-              <TableCell className="text-muted-foreground text-sm">
-                {p.cached ? "cache" : "live"}
-              </TableCell>
+              <TableCell className="text-muted-foreground text-sm">{p.error ?? new Date(p.recordedAt).toLocaleTimeString()}</TableCell>
+              <TableCell className="text-muted-foreground text-sm">{p.cached ? "cache" : "live"}</TableCell>
             </TableRow>
           ))}
         </TableBody>

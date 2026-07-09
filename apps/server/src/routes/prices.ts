@@ -25,7 +25,7 @@ const pricesRoutes: FastifyPluginAsync = async (app) => {
     const results = settled.map((result, i) =>
       result.status === "fulfilled"
         ? result.value
-        : { ticker: symbols[i], error: result.reason instanceof Error ? result.reason.message : "Unknown error" }
+        : { ticker: symbols[i], error: result.reason instanceof Error ? result.reason.message : "Unknown error" },
     );
     return results;
   });

@@ -16,10 +16,7 @@ const createPortfolioBody = z.object({
 const createTransactionBody = z.object({
   ticker: z.string().min(1),
   // Accept any casing from the client, validate against the known set.
-  type: z.preprocess(
-    (v) => (typeof v === "string" ? v.toUpperCase() : v),
-    z.enum(["BUY", "SELL", "DIVIDEND", "FEE"]),
-  ),
+  type: z.preprocess((v) => (typeof v === "string" ? v.toUpperCase() : v), z.enum(["BUY", "SELL", "DIVIDEND", "FEE"])),
   quantity: z.number().positive(),
   price: z.number().nonnegative(),
   currency: z.string().min(1),
@@ -27,10 +24,7 @@ const createTransactionBody = z.object({
   // calendar day can't shift under any timezone (UTC-11..+12); anything else
   // falls through to normal date coercion/validation.
   transactedAt: z.preprocess(
-    (v) =>
-      typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v)
-        ? new Date(`${v}T20:00:00.000Z`)
-        : v,
+    (v) => (typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) ? new Date(`${v}T20:00:00.000Z`) : v),
     z.coerce.date(),
   ),
   fee: z.number().nonnegative().optional(),
@@ -50,13 +44,7 @@ const portfoliosRoutes: FastifyPluginAsync = async (fastify) => {
   // Resolves the asset a transaction points at, applying the CEDEAR ARS→USD
   // conversion and creating the Asset row on first sight. Shared by create/edit
   // so both normalize tickers and amounts identically.
-  async function resolveAsset(input: {
-    ticker: string;
-    price: number;
-    currency: string;
-    fee?: number;
-    transactedAt: Date;
-  }) {
+  async function resolveAsset(input: { ticker: string; price: number; currency: string; fee?: number; transactedAt: Date }) {
     let { ticker, price, currency, fee } = input;
 
     // CEDEARs are stored in USD. When logged in ARS against a peso ticker
@@ -103,67 +91,55 @@ const portfoliosRoutes: FastifyPluginAsync = async (fastify) => {
     }),
   );
 
-  app.post(
-    "/portfolios",
-    { preHandler: app.authenticate, schema: { body: createPortfolioBody } },
-    async (request) => {
-      const { name } = request.body; // typed as string, already validated
-      const existingCount = await app.prisma.portfolio.count({
-        where: { userId: request.userId },
-      });
+  app.post("/portfolios", { preHandler: app.authenticate, schema: { body: createPortfolioBody } }, async (request) => {
+    const { name } = request.body; // typed as string, already validated
+    const existingCount = await app.prisma.portfolio.count({
+      where: { userId: request.userId },
+    });
 
-      return app.prisma.portfolio.create({
-        data: { userId: request.userId, name, isDefault: existingCount === 0 },
-      });
-    },
-  );
+    return app.prisma.portfolio.create({
+      data: { userId: request.userId, name, isDefault: existingCount === 0 },
+    });
+  });
 
-  app.get(
-    "/portfolios/:id/holdings",
-    { preHandler: app.authenticate, schema: { params: portfolioParams } },
-    async (request, reply) => {
-      const portfolio = await app.prisma.portfolio.findFirst({
-        where: { id: request.params.id, userId: request.userId },
-      });
-      if (!portfolio) {
-        return reply.status(404).send({ error: "Portfolio not found" });
-      }
+  app.get("/portfolios/:id/holdings", { preHandler: app.authenticate, schema: { params: portfolioParams } }, async (request, reply) => {
+    const portfolio = await app.prisma.portfolio.findFirst({
+      where: { id: request.params.id, userId: request.userId },
+    });
+    if (!portfolio) {
+      return reply.status(404).send({ error: "Portfolio not found" });
+    }
 
-      return app.prisma.holding.findMany({
-        where: { portfolioId: request.params.id },
-        include: {
-          asset: {
-            select: {
-              ticker: true,
-              name: true,
-              currency: true,
-              assetType: true,
-            },
+    return app.prisma.holding.findMany({
+      where: { portfolioId: request.params.id },
+      include: {
+        asset: {
+          select: {
+            ticker: true,
+            name: true,
+            currency: true,
+            assetType: true,
           },
         },
-        orderBy: { createdAt: "asc" },
-      });
-    },
-  );
+      },
+      orderBy: { createdAt: "asc" },
+    });
+  });
 
-  app.get(
-    "/portfolios/:id/transactions",
-    { preHandler: app.authenticate, schema: { params: portfolioParams } },
-    async (request, reply) => {
-      const portfolio = await app.prisma.portfolio.findFirst({
-        where: { id: request.params.id, userId: request.userId },
-      });
-      if (!portfolio) {
-        return reply.status(404).send({ error: "Portfolio not found" });
-      }
+  app.get("/portfolios/:id/transactions", { preHandler: app.authenticate, schema: { params: portfolioParams } }, async (request, reply) => {
+    const portfolio = await app.prisma.portfolio.findFirst({
+      where: { id: request.params.id, userId: request.userId },
+    });
+    if (!portfolio) {
+      return reply.status(404).send({ error: "Portfolio not found" });
+    }
 
-      return app.prisma.transaction.findMany({
-        where: { portfolioId: request.params.id },
-        include: { asset: { select: { ticker: true, name: true } } },
-        orderBy: [{ transactedAt: "desc" }, { createdAt: "desc" }],
-      });
-    },
-  );
+    return app.prisma.transaction.findMany({
+      where: { portfolioId: request.params.id },
+      include: { asset: { select: { ticker: true, name: true } } },
+      orderBy: [{ transactedAt: "desc" }, { createdAt: "desc" }],
+    });
+  });
 
   app.post(
     "/portfolios/:id/transactions",
@@ -214,15 +190,7 @@ const portfoliosRoutes: FastifyPluginAsync = async (fastify) => {
 
         // Only buys and sells move the position; dividends/fees leave it alone.
         if (type === "BUY" || type === "SELL") {
-          await updateHolding(
-            tx,
-            request.params.id,
-            assetId,
-            type,
-            quantity,
-            price,
-            txFee,
-          );
+          await updateHolding(tx, request.params.id, assetId, type, quantity, price, txFee);
         }
 
         return transaction;
@@ -258,9 +226,7 @@ const portfoliosRoutes: FastifyPluginAsync = async (fastify) => {
           where: { id: targetPortfolioId, userId: request.userId },
         });
         if (!target) {
-          return reply
-            .status(404)
-            .send({ error: "Target portfolio not found" });
+          return reply.status(404).send({ error: "Target portfolio not found" });
         }
       }
 
@@ -278,12 +244,7 @@ const portfoliosRoutes: FastifyPluginAsync = async (fastify) => {
       // new values, then re-apply to the now-current holding. This naturally
       // handles ticker, portfolio, and amount changes in one atomic step.
       return app.prisma.$transaction(async (tx) => {
-        await recomputeHolding(
-          tx,
-          existing.portfolioId,
-          existing.assetId,
-          existing.id,
-        );
+        await recomputeHolding(tx, existing.portfolioId, existing.assetId, existing.id);
 
         const updated = await tx.transaction.update({
           where: { id: existing.id },
@@ -303,15 +264,7 @@ const portfoliosRoutes: FastifyPluginAsync = async (fastify) => {
 
         // Only buys and sells move the position; dividends/fees leave it alone.
         if (type === "BUY" || type === "SELL") {
-          await updateHolding(
-            tx,
-            targetPortfolioId,
-            asset.id,
-            type,
-            quantity,
-            price,
-            fee,
-          );
+          await updateHolding(tx, targetPortfolioId, asset.id, type, quantity, price, fee);
         }
 
         return updated;
@@ -341,12 +294,7 @@ const portfoliosRoutes: FastifyPluginAsync = async (fastify) => {
 
       // Delete and rebuild the affected holding atomically.
       await app.prisma.$transaction(async (tx) => {
-        await recomputeHolding(
-          tx,
-          request.params.id,
-          transaction.assetId,
-          transaction.id,
-        );
+        await recomputeHolding(tx, request.params.id, transaction.assetId, transaction.id);
         await tx.transaction.delete({ where: { id: transaction.id } });
       });
 
@@ -458,12 +406,7 @@ function replayPosition(
 // purely transaction-built holding (base ≈ 0) is removed once its last transaction is gone,
 // while an imported base survives. Replaying — rather than reversing in place — is required
 // because an average-cost update loses the per-lot history needed to undo it.
-async function recomputeHolding(
-  tx: Prisma.TransactionClient,
-  portfolioId: string,
-  assetId: string,
-  transactionId: string,
-) {
+async function recomputeHolding(tx: Prisma.TransactionClient, portfolioId: string, assetId: string, transactionId: string) {
   // All BUY/SELL for this position, including the one about to be deleted (it's removed
   // from the DB after this runs). createdAt breaks ties between same-day trades (all
   // anchored at 20:00 UTC), so the replay matches the order the position was built in.
@@ -477,9 +420,7 @@ async function recomputeHolding(
   });
 
   const all = replayPosition(transactions);
-  const remaining = replayPosition(
-    transactions.filter((t) => t.id !== transactionId),
-  );
+  const remaining = replayPosition(transactions.filter((t) => t.id !== transactionId));
 
   // The portion of the current holding not explained by its transactions (an imported base,
   // or ~0 for a transaction-built holding). Drop sub-precision residue so it can't survive.

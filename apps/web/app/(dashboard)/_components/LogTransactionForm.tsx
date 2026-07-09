@@ -6,22 +6,9 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Button } from "@/components/shadcn/Button";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/shadcn/Form";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/shadcn/Form";
 import { Input } from "@/components/shadcn/Input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/shadcn/Select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/shadcn/Select";
 import { logTransaction, updateTransaction } from "../actions";
 import TickerCombobox from "./TickerCombobox";
 
@@ -85,11 +72,8 @@ export default function LogTransactionForm({
           price: String(Number(transaction.price)),
           currency: transaction.currency === "ARS" ? "ARS" : "USD",
           // Stored timestamps are anchored to a calendar day; render it for <input type="date">.
-          transactedAt: new Date(transaction.transactedAt).toLocaleDateString(
-            "en-CA",
-          ),
-          fee:
-            Number(transaction.fee) > 0 ? String(Number(transaction.fee)) : "",
+          transactedAt: new Date(transaction.transactedAt).toLocaleDateString("en-CA"),
+          fee: Number(transaction.fee) > 0 ? String(Number(transaction.fee)) : "",
           notes: transaction.notes ?? "",
         }
       : {
@@ -132,10 +116,7 @@ export default function LogTransactionForm({
 
   return (
     <Form {...form}>
-      <form
-        onSubmit={form.handleSubmit(onSubmit)}
-        className="flex flex-col gap-4"
-      >
+      <form onSubmit={(e) => void form.handleSubmit(onSubmit)(e)} className="flex flex-col gap-4">
         <FormField
           control={form.control}
           name="portfolioId"
@@ -169,10 +150,7 @@ export default function LogTransactionForm({
               <FormItem className="flex flex-col">
                 <FormLabel>Ticker</FormLabel>
                 <FormControl>
-                  <TickerCombobox
-                    value={field.value}
-                    onChange={field.onChange}
-                  />
+                  <TickerCombobox value={field.value} onChange={field.onChange} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -184,10 +162,7 @@ export default function LogTransactionForm({
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Type</FormLabel>
-                <Select
-                  onValueChange={field.onChange}
-                  defaultValue={field.value}
-                >
+                <Select onValueChange={field.onChange} defaultValue={field.value}>
                   <FormControl>
                     <SelectTrigger>
                       <SelectValue />
@@ -225,12 +200,7 @@ export default function LogTransactionForm({
               <FormItem>
                 <FormLabel>Price per share</FormLabel>
                 <FormControl>
-                  <Input
-                    type="number"
-                    step="any"
-                    placeholder="0.00"
-                    {...field}
-                  />
+                  <Input type="number" step="any" placeholder="0.00" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -245,10 +215,7 @@ export default function LogTransactionForm({
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Currency</FormLabel>
-                <Select
-                  onValueChange={field.onChange}
-                  defaultValue={field.value}
-                >
+                <Select onValueChange={field.onChange} defaultValue={field.value}>
                   <FormControl>
                     <SelectTrigger>
                       <SelectValue />

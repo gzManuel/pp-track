@@ -1,5 +1,5 @@
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { getUserId } from "@/lib/auth";
+import { serverFetch } from "@/lib/server-api";
 import LogTransactionForm from "../_components/LogTransactionForm";
 import PortfolioSwitcher from "../_components/PortfolioSwitcher";
 import TransactionsTable from "../_components/TransactionsTable";
@@ -23,69 +23,39 @@ interface Transaction {
   asset: { ticker: string; name: string };
 }
 
-function serverFetch(url: string, userId: string) {
-  return fetch(url, {
-    headers: {
-      "x-internal-secret": process.env.INTERNAL_API_SECRET!,
-      "x-user-id": userId,
-    },
-    cache: "no-store",
-  });
-}
-
-export default async function TransactionsPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ portfolio?: string }>;
-}) {
-  const session = await getServerSession(authOptions);
-  const userId = session!.user.id;
-  const serverUrl = process.env.SERVER_API_URL ?? "http://localhost:3001";
+export default async function TransactionsPage({ searchParams }: { searchParams: Promise<{ portfolio?: string }> }) {
+  const userId = await getUserId();
 
   const { portfolio } = await searchParams;
 
-  const portfoliosRes = await serverFetch(`${serverUrl}/api/portfolios`, userId);
-  const portfolios: Portfolio[] = await portfoliosRes.json();
+  const portfoliosRes = await serverFetch("/api/portfolios", { userId });
+  const portfolios = (await portfoliosRes.json()) as Portfolio[];
 
   // Default (no query param) shows every portfolio's transactions; "all" does
   // the same, "none" is an explicit empty selection, and a comma list narrows
   // to a subset.
   const showAll = portfolio === undefined || portfolio === "all";
   const explicitNone = portfolio === "none";
-  const ids =
-    !showAll && !explicitNone ? portfolio!.split(",").filter(Boolean) : [];
-  const selectedPortfolios = showAll
-    ? portfolios
-    : portfolios.filter((p) => ids.includes(p.id));
+  const ids = !showAll && !explicitNone ? portfolio.split(",").filter(Boolean) : [];
+  const selectedPortfolios = showAll ? portfolios : portfolios.filter((p) => ids.includes(p.id));
 
-  if (portfolios.length === 0) {
-    return (
-      <p className="py-20 text-center text-sm text-muted-foreground">
-        No portfolio yet. Create one from the Portfolios tab.
-      </p>
-    );
+  const firstPortfolio = portfolios[0];
+  if (!firstPortfolio) {
+    return <p className="py-20 text-center text-sm text-muted-foreground">No portfolio yet. Create one from the Portfolios tab.</p>;
   }
 
   const selectedIds = selectedPortfolios.map((p) => p.id);
-  const primaryPortfolio =
-    selectedPortfolios[0] ??
-    portfolios.find((p) => p.isDefault) ??
-    portfolios[0]!;
+  const primaryPortfolio = selectedPortfolios[0] ?? portfolios.find((p) => p.isDefault) ?? firstPortfolio;
 
   if (selectedPortfolios.length === 0) {
     return (
       <>
         <div className="mb-6 flex items-center justify-between">
           <h1 className="text-2xl font-semibold">Transactions</h1>
-          <PortfolioSwitcher
-            portfolios={portfolios}
-            selectedIds={selectedIds}
-            allSelected={showAll}
-          />
+          <PortfolioSwitcher portfolios={portfolios} selectedIds={selectedIds} allSelected={showAll} />
         </div>
         <p className="py-20 text-center text-sm text-muted-foreground">
-          No portfolios selected. Pick one from the switcher to see
-          transactions.
+          No portfolios selected. Pick one from the switcher to see transactions.
         </p>
       </>
     );
@@ -97,44 +67,26 @@ export default async function TransactionsPage({
   const loadedPortfolios = selectedPortfolios;
   const txLists = await Promise.all(
     loadedPortfolios.map((p) =>
-      serverFetch(`${serverUrl}/api/portfolios/${p.id}/transactions`, userId)
+      serverFetch(`/api/portfolios/${p.id}/transactions`, { userId })
         .then((r) => r.json())
-        .then((txs: Transaction[]) =>
-          txs.map((tx) => ({ ...tx, portfolioId: p.id, portfolioName: p.name }))
-        )
-    )
+        .then((txs: Transaction[]) => txs.map((tx) => ({ ...tx, portfolioId: p.id, portfolioName: p.name }))),
+    ),
   );
-  const transactions = txLists
-    .flat()
-    .sort(
-      (a, b) =>
-        new Date(b.transactedAt).getTime() - new Date(a.transactedAt).getTime()
-    );
+  const transactions = txLists.flat().sort((a, b) => new Date(b.transactedAt).getTime() - new Date(a.transactedAt).getTime());
 
   return (
     <>
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Transactions</h1>
-        <PortfolioSwitcher
-          portfolios={portfolios}
-          selectedIds={selectedIds}
-          allSelected={showAll}
-        />
+        <PortfolioSwitcher portfolios={portfolios} selectedIds={selectedIds} allSelected={showAll} />
       </div>
       <section className="mb-10 max-w-2xl">
         <h2 className="mb-3 text-lg font-medium">Log transaction</h2>
-        <LogTransactionForm
-          portfolios={portfolios}
-          defaultPortfolioId={primaryPortfolio.id}
-        />
+        <LogTransactionForm portfolios={portfolios} defaultPortfolioId={primaryPortfolio.id} />
       </section>
       <section>
         <h2 className="mb-3 text-lg font-medium">History</h2>
-        <TransactionsTable
-          transactions={transactions}
-          showPortfolio={loadedPortfolios.length > 1}
-          portfolios={portfolios}
-        />
+        <TransactionsTable transactions={transactions} showPortfolio={loadedPortfolios.length > 1} portfolios={portfolios} />
       </section>
     </>
   );
