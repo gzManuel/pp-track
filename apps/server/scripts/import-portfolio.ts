@@ -19,8 +19,8 @@
 import "dotenv/config";
 import fs from "node:fs";
 import readline from "node:readline";
-import prisma from "../src/prisma.js";
-import { fetchQuote } from "../src/services/yahoo-finance.js";
+import prisma from "../src/prisma";
+import { fetchQuote } from "../src/services/yahoo-finance";
 
 const [, , csvPath, userEmail = "garistozm@gmail.com"] = process.argv;
 

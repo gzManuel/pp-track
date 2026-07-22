@@ -2,8 +2,8 @@ import type { FastifyPluginAsync } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
-import { fetchQuote, toUsdTicker } from "../services/yahoo-finance.js";
-import getMepRate from "../services/mep.js";
+import { fetchQuote, toUsdTicker } from "../services/yahoo-finance";
+import getMepRate from "../services/mep";
 
 // #1 — Schemas drive both runtime validation and the inferred TS types.
 const portfolioParams = z.object({ id: z.uuid() });

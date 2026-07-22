@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { getUserId } from "@/lib/auth";
-import { serverBaseUrl, serverFetch } from "@/lib/server-api";
+import { serverFetch } from "@/lib/server-api";
 import CreatePortfolioDialog from "../_components/CreatePortfolioDialog";
 
 interface Portfolio {
@@ -31,7 +31,7 @@ async function getSummary(userId: string, portfolioId: string): Promise<Portfoli
   const tickers = rawHoldings.map((h) => h.asset.ticker).join(",");
   const priceMap: Record<string, number> = {};
   if (tickers) {
-    const pricesRes = await fetch(`${serverBaseUrl()}/api/prices?tickers=${encodeURIComponent(tickers)}`, { cache: "no-store" });
+    const pricesRes = await serverFetch(`/api/prices?tickers=${encodeURIComponent(tickers)}`);
     const prices = (await pricesRes.json()) as { ticker: string; price?: string }[];
     prices
       .filter((p) => p.price)

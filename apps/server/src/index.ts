@@ -1,12 +1,13 @@
 import "dotenv/config";
 import Fastify from "fastify";
 import { serializerCompiler, validatorCompiler } from "fastify-type-provider-zod";
-import prismaPlugin from "./plugins/prisma.js";
-import authPlugin from "./plugins/auth.js";
-import pricesRoutes from "./routes/prices.js";
-import usersRoutes from "./routes/users.js";
-import portfoliosRoutes from "./routes/portfolios.js";
-import assetsRoutes from "./routes/assets.js";
+import { env } from "./env";
+import prismaPlugin from "./plugins/prisma";
+import authPlugin from "./plugins/auth";
+import pricesRoutes from "./routes/prices";
+import usersRoutes from "./routes/users";
+import portfoliosRoutes from "./routes/portfolios";
+import assetsRoutes from "./routes/assets";
 
 const app = Fastify({ logger: true });
 
@@ -39,6 +40,4 @@ process.on("SIGINT", () => {
   });
 });
 
-const port = Number(process.env.PORT ?? 3001);
-const host = process.env.HOST ?? "0.0.0.0";
-await app.listen({ port, host });
+await app.listen({ port: env.PORT, host: env.HOST });

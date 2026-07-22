@@ -1,6 +1,6 @@
 import fp from "fastify-plugin";
 import type { PrismaClient } from "@prisma/client";
-import prisma from "../prisma.js";
+import prisma from "../prisma";
 
 declare module "fastify" {
   interface FastifyInstance {

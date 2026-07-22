@@ -5,6 +5,11 @@ node_modules
 .pnp
 .pnp.js
 
+# Local env files (never commit secrets; commit .env.example instead)
+**.env
+.env.*
+!.env.example
+
 # Personal data imports
 apps/server/scripts/*.csv
 

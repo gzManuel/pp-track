@@ -1,34 +1,38 @@
 import type { FastifyPluginAsync } from "fastify";
-import prisma from "../prisma.js";
-import { fetchQuote, toArsTicker } from "../services/yahoo-finance.js";
-import getMepRate from "../services/mep.js";
+import prisma from "../prisma";
+import { fetchQuote, toArsTicker } from "../services/yahoo-finance";
+import getMepRate from "../services/mep";
 
 const CACHE_TTL_MS = 15 * 60 * 1000;
 
 const pricesRoutes: FastifyPluginAsync = async (app) => {
-  app.get<{ Querystring: { tickers?: string; currency?: string } }>("/prices", async (request, reply) => {
-    const { tickers, currency } = request.query;
+  app.get<{ Querystring: { tickers?: string; currency?: string } }>(
+    "/prices",
+    { preHandler: app.verifyInternalSecret },
+    async (request, reply) => {
+      const { tickers, currency } = request.query;
 
-    if (!tickers) {
-      return reply.status(400).send({ error: "tickers query param is required" });
-    }
+      if (!tickers) {
+        return reply.status(400).send({ error: "tickers query param is required" });
+      }
 
-    // CEDEARs are tracked in USD; request `?currency=ARS` to fetch the D-stripped ticker.
-    const ars = currency?.toUpperCase() === "ARS";
+      // CEDEARs are tracked in USD; request `?currency=ARS` to fetch the D-stripped ticker.
+      const ars = currency?.toUpperCase() === "ARS";
 
-    const symbols = tickers
-      .split(",")
-      .map((t) => t.trim())
-      .filter(Boolean);
+      const symbols = tickers
+        .split(",")
+        .map((t) => t.trim())
+        .filter(Boolean);
 
-    const settled = await Promise.allSettled(symbols.map((s) => getPriceWithCache(s, ars)));
-    const results = settled.map((result, i) =>
-      result.status === "fulfilled"
-        ? result.value
-        : { ticker: symbols[i], error: result.reason instanceof Error ? result.reason.message : "Unknown error" },
-    );
-    return results;
-  });
+      const settled = await Promise.allSettled(symbols.map((s) => getPriceWithCache(s, ars)));
+      const results = settled.map((result, i) =>
+        result.status === "fulfilled"
+          ? result.value
+          : { ticker: symbols[i], error: result.reason instanceof Error ? result.reason.message : "Unknown error" },
+      );
+      return results;
+    },
+  );
 };
 
 export default pricesRoutes;

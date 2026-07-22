@@ -1,5 +1,5 @@
 import { getUserId } from "@/lib/auth";
-import { serverBaseUrl, serverFetch } from "@/lib/server-api";
+import { serverFetch } from "@/lib/server-api";
 import AllocationChart from "../_components/AllocationChart";
 import CreatePortfolioDialog from "../_components/CreatePortfolioDialog";
 import CurrencyToggle from "../_components/CurrencyToggle";
@@ -139,9 +139,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   const tickers = positions.map((p) => p.ticker).join(",");
   const priceMap: Record<string, number> = {};
   if (tickers) {
-    const pricesRes = await fetch(`${serverBaseUrl()}/api/prices?tickers=${encodeURIComponent(tickers)}${ars ? "&currency=ARS" : ""}`, {
-      cache: "no-store",
-    });
+    const pricesRes = await serverFetch(`/api/prices?tickers=${encodeURIComponent(tickers)}${ars ? "&currency=ARS" : ""}`);
     const prices = (await pricesRes.json()) as { ticker: string; price?: string }[];
     prices
       .filter((p) => p.price)
