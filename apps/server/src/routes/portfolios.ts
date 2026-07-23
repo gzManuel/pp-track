@@ -116,9 +116,11 @@ const portfoliosRoutes: FastifyPluginAsync = async (fastify) => {
       currency = "USD";
     }
 
-    let asset = await app.prisma.asset.findFirst({ where: { ticker } });
+    // Uniqueness is (ticker, exchange); a ticker alone can match several rows,
+    // so order deterministically instead of taking an arbitrary one.
+    let asset = await app.prisma.asset.findFirst({ where: { ticker }, orderBy: { updatedAt: "desc" } });
     if (!asset) {
-      let data: Prisma.AssetCreateInput;
+      let data: { ticker: string; name: string; assetType: string; exchange: string; currency: string };
       try {
         const quote = await fetchQuote(ticker);
         data = {
@@ -130,16 +132,18 @@ const portfoliosRoutes: FastifyPluginAsync = async (fastify) => {
         };
       } catch {
         // Yahoo lookup failed — register a minimal placeholder asset.
-        data = { ticker, name: ticker, assetType: "EQUITY", currency };
+        data = { ticker, name: ticker, assetType: "EQUITY", exchange: "", currency };
       }
 
       try {
         asset = await app.prisma.asset.create({ data });
       } catch (error) {
         // Lost a create race: another request inserted the same (ticker, exchange)
-        // first — use its row instead of failing.
+        // first — use exactly that row instead of failing.
         if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
-          asset = await app.prisma.asset.findFirst({ where: { ticker } });
+          asset = await app.prisma.asset.findUnique({
+            where: { ticker_exchange: { ticker: data.ticker, exchange: data.exchange } },
+          });
         }
         if (!asset) throw error;
       }

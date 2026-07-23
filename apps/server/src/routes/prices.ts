@@ -7,6 +7,9 @@ import getMepRate from "../services/mep.js";
 
 const CACHE_TTL_MS = 15 * 60 * 1000;
 
+// How long stale snapshots are kept before being pruned on the next write.
+const SNAPSHOT_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
+
 // Each cache-miss symbol fans out into a Yahoo fetch plus DB writes; cap the
 // batch so one request can't amplify into an unbounded number of outbound calls.
 const MAX_TICKERS = 50;
@@ -63,6 +66,9 @@ async function getPriceWithCache(prisma: PrismaClient, symbol: string, ars: bool
 
   const asset = await prisma.asset.findFirst({
     where: { ticker: fetchSymbol },
+    // Uniqueness is (ticker, exchange) — order deterministically in case the
+    // same ticker exists on several exchanges.
+    orderBy: { updatedAt: "desc" },
     include: {
       priceSnapshots: {
         where: { recordedAt: { gte: cutoff } },
@@ -109,9 +115,12 @@ async function getPriceWithCache(prisma: PrismaClient, symbol: string, ars: bool
           },
         });
       } catch (error) {
-        // Lost a create race with a concurrent request — reuse its row.
+        // Lost a create race with a concurrent request — reuse exactly the
+        // colliding (ticker, exchange) row.
         if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
-          created = await prisma.asset.findFirst({ where: { ticker: fetchSymbol } });
+          created = await prisma.asset.findUnique({
+            where: { ticker_exchange: { ticker: fetchSymbol, exchange: quote.exchange ?? "" } },
+          });
         }
         if (!created) throw error;
       }
@@ -135,6 +144,12 @@ async function getPriceWithCache(prisma: PrismaClient, symbol: string, ars: bool
       },
     });
 
+    // Snapshots are a price cache, not history — prune this asset's stale rows
+    // in the same write path so the table can't grow without bound.
+    await prisma.priceSnapshot.deleteMany({
+      where: { assetId, recordedAt: { lt: new Date(Date.now() - SNAPSHOT_RETENTION_MS) } },
+    });
+
     result = {
       ticker: symbol,
       price: snapshot.price.toString(),
@@ -149,7 +164,8 @@ async function getPriceWithCache(prisma: PrismaClient, symbol: string, ars: bool
   if (ars && mepRate != null && assetType === "CRYPTOCURRENCY" && result.currency === "USD") {
     return {
       ...result,
-      price: (Number(result.price) * mepRate).toString(),
+      // Decimal, not float math — consistent with every other money path.
+      price: new Prisma.Decimal(result.price).times(mepRate).toString(),
       currency: "ARS",
     };
   }

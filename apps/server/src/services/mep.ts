@@ -3,6 +3,10 @@
 const ARGENTINA_DATOS_BASE = "https://api.argentinadatos.com";
 const DOLAR_API_BASE = "https://dolarapi.com";
 
+// A hung upstream must never hang a request handler — especially here, where
+// the in-flight dedupe below would pin every ARS conversion on one stuck fetch.
+const FETCH_TIMEOUT_MS = 5000;
+
 interface DolarQuote {
   moneda: string;
   casa: string;
@@ -30,7 +34,9 @@ function toUtcDateStr(d: Date): string {
 /** Most recent published MEP rate on or before `at`, or null if unavailable. */
 async function mepOnOrBefore(at: Date): Promise<number | null> {
   try {
-    const res = await fetch(`${ARGENTINA_DATOS_BASE}/v1/cotizaciones/dolares/bolsa`);
+    const res = await fetch(`${ARGENTINA_DATOS_BASE}/v1/cotizaciones/dolares/bolsa`, {
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    });
     if (!res.ok) return null;
     const series = (await res.json()) as DolarQuote[];
 
@@ -49,7 +55,9 @@ async function mepOnOrBefore(at: Date): Promise<number | null> {
 
 /** Current live MEP rate from dolarapi. Throws if the request fails. */
 async function currentMep(): Promise<number> {
-  const res = await fetch(`${DOLAR_API_BASE}/v1/dolares/bolsa`);
+  const res = await fetch(`${DOLAR_API_BASE}/v1/dolares/bolsa`, {
+    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+  });
   if (!res.ok) {
     throw new Error(`Failed to fetch current MEP rate: ${String(res.status)}`);
   }

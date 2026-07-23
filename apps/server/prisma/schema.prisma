@@ -74,11 +74,18 @@ model Holding {
   @@map("holdings")
 }
 
+enum TransactionType {
+  BUY
+  SELL
+  DIVIDEND
+  FEE
+}
+
 model Transaction {
   id          String   @id @default(uuid()) @db.Uuid
   portfolioId String   @map("portfolio_id") @db.Uuid
   assetId     String   @map("asset_id") @db.Uuid
-  type        String
+  type        TransactionType
   quantity    Decimal  @db.Decimal(18, 8)
   price       Decimal  @db.Decimal(18, 8)
   fee         Decimal  @default(0) @db.Decimal(18, 8)
@@ -90,6 +97,9 @@ model Transaction {
   portfolio Portfolio @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
   asset     Asset     @relation(fields: [assetId], references: [id])
 
+  // Covers the replay query (portfolioId, assetId ordered by transactedAt) and,
+  // via prefix, the per-portfolio transaction list.
+  @@index([portfolioId, assetId, transactedAt])
   @@map("transactions")
 }
 

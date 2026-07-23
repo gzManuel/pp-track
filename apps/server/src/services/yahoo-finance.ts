@@ -2,6 +2,11 @@ import YahooFinance from "yahoo-finance2";
 
 const yf = new YahooFinance();
 
+// A hung Yahoo request must never hang a request handler (a /prices call fans
+// out into up to 50 of these).
+const FETCH_TIMEOUT_MS = 5000;
+const fetchTimeout = () => ({ fetchOptions: { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) } });
+
 export interface QuoteResult {
   symbol: string;
   price: number;
@@ -48,7 +53,7 @@ export async function searchSymbols(query: string): Promise<SymbolSearchResult[]
   // `validateResult: false` skips yahoo-finance2's bundled JSON-schema check,
   // which rejects otherwise-valid ETF/equity quotes when Yahoo's response shape
   // drifts ahead of the installed library version.
-  const result = (await yf.search(query, { newsCount: 0 }, { validateResult: false })) as {
+  const result = (await yf.search(query, { newsCount: 0 }, { validateResult: false, ...fetchTimeout() })) as {
     quotes?: Record<string, unknown>[];
   };
 
@@ -65,7 +70,7 @@ export async function searchSymbols(query: string): Promise<SymbolSearchResult[]
 export async function fetchQuote(symbol: string): Promise<QuoteResult> {
   // yahoo-finance2's Quote type is a loose union whose fields resolve to `any`;
   // pin the shape we consume at this boundary so callers get real types.
-  const quote = (await yf.quote(symbol)) as unknown as
+  const quote = (await yf.quote(symbol, undefined, fetchTimeout())) as unknown as
     | {
         symbol?: string;
         regularMarketPrice?: number | null;
