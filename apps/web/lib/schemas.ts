@@ -48,3 +48,22 @@ export const updateTransactionPayloadSchema = transactionPayloadSchema.extend({
 export type UpdateTransactionPayload = z.infer<typeof updateTransactionPayloadSchema>;
 
 export const portfolioNameSchema = z.string().trim().min(1, "Required").max(100);
+
+/**
+ * Convert validated form values (strings from inputs) into the numeric payload
+ * the server actions accept. Kept pure so it is unit-testable; also the single
+ * place where empty-string optionals are normalized to `undefined` (so the DB
+ * never stores "" notes/fees).
+ */
+export function toTransactionPayload(values: TransactionFormValues): TransactionPayload {
+  return {
+    ticker: values.ticker,
+    type: values.type,
+    quantity: Number(values.quantity),
+    price: Number(values.price),
+    currency: values.currency,
+    transactedAt: values.transactedAt,
+    fee: values.fee ? Number(values.fee) : undefined,
+    notes: values.notes?.trim() ? values.notes.trim() : undefined,
+  };
+}

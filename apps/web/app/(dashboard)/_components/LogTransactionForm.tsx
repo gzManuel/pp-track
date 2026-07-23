@@ -4,7 +4,7 @@ import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { transactionFormSchema, type TransactionFormValues } from "@/lib/schemas";
+import { toTransactionPayload, transactionFormSchema, type TransactionFormValues } from "@/lib/schemas";
 import { Button } from "@/components/shadcn/Button";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/shadcn/Form";
 import { Input } from "@/components/shadcn/Input";
@@ -75,13 +75,8 @@ export default function LogTransactionForm({
 
   function onSubmit(values: FormValues) {
     startTransition(async () => {
-      const { portfolioId, ...data } = values;
-      const payload = {
-        ...data,
-        quantity: Number(values.quantity),
-        price: Number(values.price),
-        fee: values.fee ? Number(values.fee) : undefined,
-      };
+      const { portfolioId } = values;
+      const payload = toTransactionPayload(values);
 
       if (transaction) {
         await updateTransaction(transaction.portfolioId, transaction.id, {

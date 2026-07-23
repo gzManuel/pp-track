@@ -4,7 +4,7 @@ import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { fetchQuote, toUsdTicker } from "../services/yahoo-finance.js";
 import getMepRate from "../services/mep.js";
-import { HttpError } from "../http-error.js";
+import { recomputeHolding } from "../services/holdings.js";
 
 // #1 — Schemas drive both runtime validation and the inferred TS types.
 const portfolioParams = z.object({ id: z.uuid() });
@@ -14,7 +14,8 @@ const createPortfolioBody = z.object({
   name: z.string().min(1),
 });
 
-const createTransactionBody = z.object({
+// Exported for schema-level tests (date anchoring, type normalization).
+export const createTransactionBody = z.object({
   ticker: z.string().min(1),
   // Accept any casing from the client, validate against the known set.
   type: z.preprocess((v) => (typeof v === "string" ? v.toUpperCase() : v), z.enum(["BUY", "SELL", "DIVIDEND", "FEE"])),
@@ -292,8 +293,14 @@ const portfoliosRoutes: FastifyPluginAsync = async (fastify) => {
         });
 
         // Only buys and sells move the position; dividends/fees leave it alone.
+        // Rebuild via chronological replay (not append) so a backdated BUY
+        // interleaves correctly with existing sells; a SELL exceeding the
+        // position held at its date rejects the whole transaction with 422.
         if (type === "BUY" || type === "SELL") {
-          await updateHolding(tx, request.params.id, assetId, type, quantity, price, txFee);
+          await recomputeHolding(tx, request.params.id, assetId, {
+            excludeFromBase: transaction.id,
+            rejectOversellFor: type === "SELL" ? transaction.id : undefined,
+          });
         }
 
         return transaction;
@@ -371,7 +378,10 @@ const portfoliosRoutes: FastifyPluginAsync = async (fastify) => {
 
         // Only buys and sells move the position; dividends/fees leave it alone.
         if (type === "BUY" || type === "SELL") {
-          await recomputeHolding(tx, targetPortfolioId, asset.id, { excludeFromBase: existing.id });
+          await recomputeHolding(tx, targetPortfolioId, asset.id, {
+            excludeFromBase: existing.id,
+            rejectOversellFor: type === "SELL" ? existing.id : undefined,
+          });
         }
 
         return updated;
@@ -411,185 +421,3 @@ const portfoliosRoutes: FastifyPluginAsync = async (fastify) => {
 };
 
 export default portfoliosRoutes;
-
-const ZERO = new Prisma.Decimal(0);
-
-// Quantities below the stored Decimal(18,8) precision are rounding residue, not a
-// real position — treat anything smaller as zero so a rebuild can't leave a dead
-// holding alive.
-const QTY_EPSILON = new Prisma.Decimal("1e-8");
-
-// Serializes concurrent read-modify-write cycles on one (portfolio, asset)
-// holding: without the row lock, two parallel transactions both read the same
-// starting quantity and the second write silently overwrites the first.
-// Locking a row that doesn't exist yet is a no-op; the @@unique constraint
-// still catches double-creates.
-async function lockHolding(tx: Prisma.TransactionClient, portfolioId: string, assetId: string) {
-  await tx.$executeRaw`SELECT id FROM holdings WHERE portfolio_id = ${portfolioId}::uuid AND asset_id = ${assetId}::uuid FOR UPDATE`;
-}
-
-// Weighted-average-cost holding update. A BUY blends the trade price (plus fee)
-// into avgCostBasis; a SELL reduces quantity at the existing average, closing the
-// position when it reaches zero. All arithmetic is done in Decimal — money must
-// never touch binary floats. Quantities/prices are already in the asset's currency.
-async function updateHolding(
-  tx: Prisma.TransactionClient,
-  portfolioId: string,
-  assetId: string,
-  type: "BUY" | "SELL",
-  quantity: number,
-  price: number,
-  fee: number,
-) {
-  await lockHolding(tx, portfolioId, assetId);
-
-  // JS numbers convert exactly via their decimal string representation.
-  const qty = new Prisma.Decimal(quantity);
-  const cost = qty.times(new Prisma.Decimal(price)).plus(new Prisma.Decimal(fee));
-
-  const existing = await tx.holding.findUnique({
-    where: { portfolioId_assetId: { portfolioId, assetId } },
-  });
-
-  if (type === "BUY") {
-    if (!existing) {
-      await tx.holding.create({
-        data: {
-          portfolioId,
-          assetId,
-          quantity: qty,
-          avgCostBasis: cost.div(qty),
-        },
-      });
-      return;
-    }
-
-    const oldValue = existing.quantity.times(existing.avgCostBasis);
-    const newQty = existing.quantity.plus(qty);
-    await tx.holding.update({
-      where: { id: existing.id },
-      data: {
-        quantity: newQty,
-        avgCostBasis: oldValue.plus(cost).div(newQty),
-      },
-    });
-    return;
-  }
-
-  // SELL — reject oversells instead of silently vaporizing the position (the
-  // transaction row would still be recorded, so the excess would just vanish).
-  if (!existing || qty.gt(existing.quantity)) {
-    throw new HttpError(422, "Cannot sell more than the currently held quantity");
-  }
-
-  const newQty = existing.quantity.minus(qty);
-  if (newQty.lt(QTY_EPSILON)) {
-    // Position fully closed: drop the row.
-    await tx.holding.delete({ where: { id: existing.id } });
-    return;
-  }
-
-  // avgCostBasis is unchanged on a sell; only the share count drops.
-  await tx.holding.update({
-    where: { id: existing.id },
-    data: { quantity: newQty },
-  });
-}
-
-// Replays BUY/SELL transactions in (quantity, value) space, where `value` is the total
-// cost basis (avgCostBasis * quantity). A BUY adds price*qty + fee; a SELL removes shares
-// at the running average (value drops proportionally, so the average is unchanged).
-function replayPosition(
-  transactions: {
-    type: string;
-    quantity: Prisma.Decimal;
-    price: Prisma.Decimal;
-    fee: Prisma.Decimal;
-  }[],
-): { quantity: Prisma.Decimal; value: Prisma.Decimal } {
-  let quantity = ZERO;
-  let value = ZERO;
-  for (const t of transactions) {
-    if (t.type === "BUY") {
-      quantity = quantity.plus(t.quantity);
-      value = value.plus(t.quantity.times(t.price)).plus(t.fee);
-    } else {
-      const avg = quantity.gt(0) ? value.div(quantity) : ZERO;
-      const sold = Prisma.Decimal.min(t.quantity, quantity);
-      quantity = Prisma.Decimal.max(ZERO, quantity.minus(t.quantity));
-      value = Prisma.Decimal.max(ZERO, value.minus(sold.times(avg)));
-    }
-  }
-  return { quantity, value };
-}
-
-// Rebuilds a holding from a full chronological replay of its transactions. A holding's
-// quantity is the sum of an optional imported base (from scripts/import-portfolio.ts,
-// with no backing transactions) and everything its BUY/SELL transactions added. We
-// recover that base as the residual `holding − replay(explained)`, then rebuild as
-// `base + replay(rebuilt)`. So a purely transaction-built holding (base ≈ 0) is removed
-// once its last transaction is gone, while an imported base survives. Replaying — rather
-// than reversing in place — is required because an average-cost update loses the
-// per-lot history needed to undo it.
-//
-// The two exclusion modes cover the callers' timing relative to the holding's state:
-// - `excludeFromReplay`: the transaction is still in the DB and reflected in the holding
-//   (delete, or the removal half of an edit) — it counts toward the residual but is
-//   dropped from the rebuild.
-// - `excludeFromBase`: the transaction is in the DB but NOT yet reflected in the holding
-//   (the reapply half of an edit, after the removal pass) — the residual is computed
-//   without it, and the rebuild replays everything chronologically.
-async function recomputeHolding(
-  tx: Prisma.TransactionClient,
-  portfolioId: string,
-  assetId: string,
-  opts: { excludeFromReplay?: string; excludeFromBase?: string },
-) {
-  await lockHolding(tx, portfolioId, assetId);
-
-  // createdAt breaks ties between same-day trades (bare dates are anchored at a fixed
-  // UTC time), so the replay matches the order the position was built in.
-  const transactions = await tx.transaction.findMany({
-    where: { portfolioId, assetId, type: { in: ["BUY", "SELL"] } },
-    orderBy: [{ transactedAt: "asc" }, { createdAt: "asc" }],
-  });
-
-  const existing = await tx.holding.findUnique({
-    where: { portfolioId_assetId: { portfolioId, assetId } },
-  });
-
-  const explained = replayPosition(transactions.filter((t) => t.id !== opts.excludeFromBase));
-  const rebuilt = replayPosition(transactions.filter((t) => t.id !== opts.excludeFromReplay));
-
-  // The portion of the current holding not explained by its transactions (an imported base,
-  // or ~0 for a transaction-built holding). Drop sub-precision residue so it can't survive.
-  const holdingQty = existing?.quantity ?? ZERO;
-  const holdingValue = holdingQty.times(existing?.avgCostBasis ?? ZERO);
-  let baseQty = holdingQty.minus(explained.quantity);
-  let baseValue = holdingValue.minus(explained.value);
-  if (baseQty.abs().lt(QTY_EPSILON)) {
-    baseQty = ZERO;
-    baseValue = ZERO;
-  }
-
-  const newQty = baseQty.plus(rebuilt.quantity);
-
-  // Nothing left once the base and remaining transactions are combined: drop the row.
-  if (newQty.lt(QTY_EPSILON)) {
-    if (existing) await tx.holding.delete({ where: { id: existing.id } });
-    return;
-  }
-
-  const avgCostBasis = baseValue.plus(rebuilt.value).div(newQty);
-
-  if (existing) {
-    await tx.holding.update({
-      where: { id: existing.id },
-      data: { quantity: newQty, avgCostBasis },
-    });
-  } else {
-    await tx.holding.create({
-      data: { portfolioId, assetId, quantity: newQty, avgCostBasis },
-    });
-  }
-}

@@ -7,12 +7,13 @@
     "dev": "tsx watch src/index.ts",
     "generate": "prisma generate --schema=./prisma/schema.prisma",
     "postinstall": "prisma generate --schema=./prisma/schema.prisma",
-    "build": "tsc",
+    "build": "tsc -p tsconfig.build.json",
     "start": "node dist/index.js",
     "migrate": "prisma migrate dev --config=./prisma/prisma.config.ts --schema=./prisma/schema.prisma",
     "migrate:deploy": "prisma migrate deploy --config=./prisma/prisma.config.ts --schema=./prisma/schema.prisma",
     "lint": "eslint --max-warnings 0",
     "check-types": "tsc --noEmit",
+    "test": "vitest run",
     "import-portfolio": "tsx scripts/import-portfolio.ts"
   },
   "dependencies": {
@@ -32,6 +33,7 @@
     "prisma": "^7.8.0",
     "tsx": "^4.0.0",
     "typescript": "5.9.2",
-    "typescript-eslint": "^8.50.0"
+    "typescript-eslint": "^8.50.0",
+    "vitest": "^4.1.10"
   }
 }
