@@ -56,6 +56,14 @@ async function currentMep(): Promise<number> {
   return midRate((await res.json()) as DolarQuote);
 }
 
+// Every uncached lookup downloads the entire historical "bolsa" series, so a
+// short in-memory TTL cache keyed by calendar day (mirroring the 15-minute
+// price cache) plus in-flight dedupe keeps a burst of ARS conversions from
+// firing the same fetch N times in parallel.
+const RATE_TTL_MS = 15 * 60 * 1000;
+const rateCache = new Map<string, { rate: number; expiresAt: number }>();
+const inFlight = new Map<string, Promise<number>>();
+
 /**
  * Dólar MEP (ARS per USD) on or before `at`. Uses the published "bolsa" series
  * for historical dates and falls back to the current live rate when no entry
@@ -63,9 +71,24 @@ async function currentMep(): Promise<number> {
  * unreachable.
  */
 async function getMepRate(at: Date): Promise<number> {
-  const historical = await mepOnOrBefore(at);
-  if (historical != null) return historical;
-  return currentMep();
+  const key = toUtcDateStr(at);
+
+  const cached = rateCache.get(key);
+  if (cached && cached.expiresAt > Date.now()) return cached.rate;
+
+  const pending = inFlight.get(key);
+  if (pending) return pending;
+
+  const promise = (async () => {
+    const rate = (await mepOnOrBefore(at)) ?? (await currentMep());
+    rateCache.set(key, { rate, expiresAt: Date.now() + RATE_TTL_MS });
+    return rate;
+  })().finally(() => {
+    inFlight.delete(key);
+  });
+
+  inFlight.set(key, promise);
+  return promise;
 }
 
 export default getMepRate;

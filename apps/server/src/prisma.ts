@@ -1,11 +1,8 @@
 import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
+import { env } from "./env";
 
-const connectionString = process.env.DATABASE_URL;
-if (!connectionString) {
-  throw new Error("DATABASE_URL is not set");
-}
-
-const adapter = new PrismaPg({ connectionString });
+// `env` already validated DATABASE_URL at startup — no re-checking here.
+const adapter = new PrismaPg({ connectionString: env.DATABASE_URL });
 
 export default new PrismaClient({ adapter });
