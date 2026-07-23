@@ -16,5 +16,7 @@ export default withAuth(
 );
 
 export const config = {
-  matcher: ["/((?!api/auth|_next/static|_next/image|favicon\\.ico).*)"],
+  // Skip auth for next-auth routes, Next internals, and any file-looking path
+  // (robots.txt, images, manifests) so public static assets aren't gated.
+  matcher: ["/((?!api/auth|_next/static|_next/image|.*\\..*).*)"],
 };

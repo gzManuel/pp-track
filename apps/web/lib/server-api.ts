@@ -61,3 +61,18 @@ export function serverFetch(path: string, options: ServerFetchOptions = {}): Pro
     },
   });
 }
+
+/**
+ * `serverFetch` + JSON parsing with mandatory status checking. Throws a
+ * descriptive error on any non-2xx response instead of letting callers crash
+ * later on an unexpected body shape. Prefer this for all read paths; use raw
+ * `serverFetch` only when you need the Response itself (e.g. 204 deletes).
+ */
+export async function serverFetchJson<T>(path: string, options: ServerFetchOptions = {}): Promise<T> {
+  const res = await serverFetch(path, options);
+  if (!res.ok) {
+    const body = (await res.text().catch(() => "")).slice(0, 200);
+    throw new Error(`Backend request failed: ${String(res.status)} ${path}${body ? ` — ${body}` : ""}`);
+  }
+  return res.json() as Promise<T>;
+}

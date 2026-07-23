@@ -52,7 +52,9 @@ export default function TransactionsTable({
       <TableBody>
         {transactions.map((tx) => (
           <TableRow key={tx.id}>
-            <TableCell className="text-sm text-muted-foreground">{new Date(tx.transactedAt).toLocaleDateString()}</TableCell>
+            {/* Slice the stored UTC calendar day directly — converting through a
+                local Date would show the previous day for viewers west of UTC. */}
+            <TableCell className="text-sm text-muted-foreground">{tx.transactedAt.slice(0, 10)}</TableCell>
             {showPortfolio && <TableCell className="text-sm text-muted-foreground">{tx.portfolioName}</TableCell>}
             <TableCell className="font-mono font-medium">{tx.asset.ticker}</TableCell>
             <TableCell>

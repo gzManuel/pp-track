@@ -37,6 +37,11 @@ export const authOptions: NextAuthOptions = {
   session: {
     strategy: "jwt",
   },
+  pages: {
+    // The landing page hosts the app's sign-in UI; without this, protected
+    // routes bounce to next-auth's unstyled built-in sign-in page.
+    signIn: "/",
+  },
   callbacks: {
     async jwt({ token, user }) {
       // `user` is only populated on initial sign-in; next-auth types it as

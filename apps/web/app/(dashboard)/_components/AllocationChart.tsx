@@ -10,15 +10,9 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from "@/components/shadcn/Chart";
-import type { EnrichedHolding } from "../dashboard/page";
+import type { EnrichedHolding } from "@/lib/types";
+import { formatMoney as fmt } from "@/lib/utils";
 import { tickerColorMap } from "./chartColors";
-
-function fmt(value: number, decimals = 2) {
-  return value.toLocaleString("en-US", {
-    minimumFractionDigits: decimals,
-    maximumFractionDigits: decimals,
-  });
-}
 
 const RADIAN = Math.PI / 180;
 

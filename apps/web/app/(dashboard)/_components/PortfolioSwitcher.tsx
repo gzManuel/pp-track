@@ -82,7 +82,7 @@ export default function PortfolioSwitcher({
           <CommandList>
             <CommandEmpty>No portfolios found.</CommandEmpty>
             <CommandGroup>
-              <CommandItem value="All Portfolios" onSelect={toggleAll}>
+              <CommandItem value="All Portfolios" aria-checked={allSelected} onSelect={toggleAll}>
                 <CheckBox checked={allSelected} />
                 All Portfolios
               </CommandItem>
@@ -93,6 +93,7 @@ export default function PortfolioSwitcher({
                 <CommandItem
                   key={p.id}
                   value={p.name}
+                  aria-checked={allSelected || selectedIds.includes(p.id)}
                   onSelect={() => {
                     toggle(p.id);
                   }}

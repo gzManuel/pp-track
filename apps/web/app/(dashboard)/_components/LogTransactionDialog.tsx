@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/shadcn/Button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/shadcn/Dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/shadcn/Dialog";
 import LogTransactionForm from "./LogTransactionForm";
 
 export default function LogTransactionDialog({
@@ -26,6 +26,7 @@ export default function LogTransactionDialog({
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>Log transaction</DialogTitle>
+          <DialogDescription>Record a buy or sell to update your holdings.</DialogDescription>
         </DialogHeader>
         <LogTransactionForm
           portfolios={portfolios}

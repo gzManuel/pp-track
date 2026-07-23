@@ -20,13 +20,14 @@ export default function CurrencyToggle() {
   }
 
   return (
-    <div className="inline-flex rounded-md border p-0.5">
+    <div role="group" aria-label="Display currency" className="inline-flex rounded-md border p-0.5">
       {OPTIONS.map((opt) => (
         <Button
           key={opt}
           variant={active === opt ? "default" : "ghost"}
           size="sm"
           className="h-7 px-3"
+          aria-pressed={active === opt}
           onClick={() => {
             select(opt);
           }}

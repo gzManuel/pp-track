@@ -1,11 +1,8 @@
 "use client";
 
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/shadcn/Table";
-import type { EnrichedHolding } from "../dashboard/page";
-
-function fmt(value: number, decimals = 2) {
-  return value.toLocaleString("en-US", { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
-}
+import type { EnrichedHolding } from "@/lib/types";
+import { formatMoney as fmt } from "@/lib/utils";
 
 // Shares: whole numbers for stocks/ETFs, but crypto positions are fractional
 // (e.g. 0.05 BTC), so show up to 8 decimals and trim trailing zeros.

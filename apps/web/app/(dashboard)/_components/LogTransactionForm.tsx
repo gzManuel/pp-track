@@ -4,7 +4,7 @@ import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
+import { transactionFormSchema, type TransactionFormValues } from "@/lib/schemas";
 import { Button } from "@/components/shadcn/Button";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/shadcn/Form";
 import { Input } from "@/components/shadcn/Input";
@@ -26,25 +26,7 @@ export interface EditableTransaction {
   notes: string | null;
 }
 
-const schema = z.object({
-  portfolioId: z.string().min(1, "Required"),
-  ticker: z.string().min(1, "Required"),
-  type: z.enum(["BUY", "SELL"]),
-  quantity: z
-    .string()
-    .min(1, "Required")
-    .refine((v) => Number(v) > 0, "Must be positive"),
-  price: z
-    .string()
-    .min(1, "Required")
-    .refine((v) => Number(v) > 0, "Must be positive"),
-  currency: z.enum(["USD", "ARS"]),
-  transactedAt: z.string().min(1, "Required"),
-  fee: z.string().optional(),
-  notes: z.string().optional(),
-});
-
-type FormValues = z.infer<typeof schema>;
+type FormValues = TransactionFormValues;
 
 export default function LogTransactionForm({
   portfolios,
@@ -62,7 +44,7 @@ export default function LogTransactionForm({
   const submitLabel = transaction ? "Save changes" : "Save transaction";
 
   const form = useForm<FormValues>({
-    resolver: zodResolver(schema),
+    resolver: zodResolver(transactionFormSchema),
     defaultValues: transaction
       ? {
           portfolioId: transaction.portfolioId,
@@ -71,8 +53,10 @@ export default function LogTransactionForm({
           quantity: String(Number(transaction.quantity)),
           price: String(Number(transaction.price)),
           currency: transaction.currency === "ARS" ? "ARS" : "USD",
-          // Stored timestamps are anchored to a calendar day; render it for <input type="date">.
-          transactedAt: new Date(transaction.transactedAt).toLocaleDateString("en-CA"),
+          // Stored timestamps are anchored to a UTC calendar day — slice the ISO
+          // date directly. Round-tripping through Date/toLocaleDateString would
+          // shift the day for viewers west of UTC (e.g. Argentina, UTC-3).
+          transactedAt: transaction.transactedAt.slice(0, 10),
           fee: Number(transaction.fee) > 0 ? String(Number(transaction.fee)) : "",
           notes: transaction.notes ?? "",
         }
