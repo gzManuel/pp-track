@@ -37,6 +37,54 @@ const updateTransactionBody = createTransactionBody.extend({
   portfolioId: z.uuid().optional(),
 });
 
+// Response schemas keep handlers from leaking whole DB rows by default (a future
+// sensitive column stays server-side unless explicitly added here). Decimal
+// columns serialize as strings to preserve precision; Dates stringify to ISO.
+const decimalString = z.instanceof(Prisma.Decimal).transform((d) => d.toString());
+
+const errorResponse = z.object({ error: z.string() });
+
+const portfolioResponse = z.object({
+  id: z.uuid(),
+  userId: z.uuid(),
+  name: z.string(),
+  description: z.string().nullable(),
+  currency: z.string(),
+  isDefault: z.boolean(),
+  createdAt: z.date(),
+});
+
+const holdingResponse = z.object({
+  id: z.uuid(),
+  portfolioId: z.uuid(),
+  assetId: z.uuid(),
+  quantity: decimalString,
+  avgCostBasis: decimalString,
+  createdAt: z.date(),
+  updatedAt: z.date(),
+  asset: z.object({
+    ticker: z.string(),
+    name: z.string(),
+    currency: z.string(),
+    assetType: z.string(),
+  }),
+});
+
+const transactionResponse = z.object({
+  id: z.uuid(),
+  portfolioId: z.uuid(),
+  assetId: z.uuid(),
+  type: z.string(),
+  quantity: decimalString,
+  price: decimalString,
+  fee: decimalString,
+  currency: z.string(),
+  transactedAt: z.date(),
+  notes: z.string().nullable(),
+  createdAt: z.date(),
+  asset: z.object({ ticker: z.string(), name: z.string() }),
+});
+
 const portfoliosRoutes: FastifyPluginAsync = async (fastify) => {
   // Opt this plugin's routes into Zod-typed request/reply inference.
   const app = fastify.withTypeProvider<ZodTypeProvider>();
@@ -84,68 +132,87 @@ const portfoliosRoutes: FastifyPluginAsync = async (fastify) => {
 
   // #2 — `app.authenticate` runs first and sets `request.userId`.
   // #3 — `app.prisma` is the decorated shared client (no direct import).
-  app.get("/portfolios", { preHandler: app.authenticate }, async (request) =>
+  app.get("/portfolios", { preHandler: app.authenticate, schema: { response: { 200: z.array(portfolioResponse) } } }, async (request) =>
     app.prisma.portfolio.findMany({
       where: { userId: request.userId },
       orderBy: [{ isDefault: "desc" }, { createdAt: "asc" }],
     }),
   );
 
-  app.post("/portfolios", { preHandler: app.authenticate, schema: { body: createPortfolioBody } }, async (request) => {
-    const { name } = request.body; // typed as string, already validated
-    const existingCount = await app.prisma.portfolio.count({
-      where: { userId: request.userId },
-    });
+  app.post(
+    "/portfolios",
+    {
+      preHandler: app.authenticate,
+      schema: { body: createPortfolioBody, response: { 201: portfolioResponse } },
+    },
+    async (request, reply) => {
+      const { name } = request.body; // typed as string, already validated
+      const existingCount = await app.prisma.portfolio.count({
+        where: { userId: request.userId },
+      });
 
-    return app.prisma.portfolio.create({
-      data: { userId: request.userId, name, isDefault: existingCount === 0 },
-    });
-  });
+      const portfolio = await app.prisma.portfolio.create({
+        data: { userId: request.userId, name, isDefault: existingCount === 0 },
+      });
+      return reply.status(201).send(portfolio);
+    },
+  );
 
-  app.get("/portfolios/:id/holdings", { preHandler: app.authenticate, schema: { params: portfolioParams } }, async (request, reply) => {
-    const portfolio = await app.prisma.portfolio.findFirst({
-      where: { id: request.params.id, userId: request.userId },
-    });
-    if (!portfolio) {
-      return reply.status(404).send({ error: "Portfolio not found" });
-    }
+  app.get(
+    "/portfolios/:id/holdings",
+    { preHandler: app.authenticate, schema: { params: portfolioParams, response: { 200: z.array(holdingResponse), 404: errorResponse } } },
+    async (request, reply) => {
+      const portfolio = await app.prisma.portfolio.findFirst({
+        where: { id: request.params.id, userId: request.userId },
+      });
+      if (!portfolio) {
+        return reply.status(404).send({ error: "Portfolio not found" });
+      }
 
-    return app.prisma.holding.findMany({
-      where: { portfolioId: request.params.id },
-      include: {
-        asset: {
-          select: {
-            ticker: true,
-            name: true,
-            currency: true,
-            assetType: true,
+      return app.prisma.holding.findMany({
+        where: { portfolioId: request.params.id },
+        include: {
+          asset: {
+            select: {
+              ticker: true,
+              name: true,
+              currency: true,
+              assetType: true,
+            },
           },
         },
-      },
-      orderBy: { createdAt: "asc" },
-    });
-  });
+        orderBy: { createdAt: "asc" },
+      });
+    },
+  );
 
-  app.get("/portfolios/:id/transactions", { preHandler: app.authenticate, schema: { params: portfolioParams } }, async (request, reply) => {
-    const portfolio = await app.prisma.portfolio.findFirst({
-      where: { id: request.params.id, userId: request.userId },
-    });
-    if (!portfolio) {
-      return reply.status(404).send({ error: "Portfolio not found" });
-    }
+  app.get(
+    "/portfolios/:id/transactions",
+    {
+      preHandler: app.authenticate,
+      schema: { params: portfolioParams, response: { 200: z.array(transactionResponse), 404: errorResponse } },
+    },
+    async (request, reply) => {
+      const portfolio = await app.prisma.portfolio.findFirst({
+        where: { id: request.params.id, userId: request.userId },
+      });
+      if (!portfolio) {
+        return reply.status(404).send({ error: "Portfolio not found" });
+      }
 
-    return app.prisma.transaction.findMany({
-      where: { portfolioId: request.params.id },
-      include: { asset: { select: { ticker: true, name: true } } },
-      orderBy: [{ transactedAt: "desc" }, { createdAt: "desc" }],
-    });
-  });
+      return app.prisma.transaction.findMany({
+        where: { portfolioId: request.params.id },
+        include: { asset: { select: { ticker: true, name: true } } },
+        orderBy: [{ transactedAt: "desc" }, { createdAt: "desc" }],
+      });
+    },
+  );
 
   app.post(
     "/portfolios/:id/transactions",
     {
       preHandler: app.authenticate,
-      schema: { params: portfolioParams, body: createTransactionBody },
+      schema: { params: portfolioParams, body: createTransactionBody, response: { 201: transactionResponse, 404: errorResponse } },
     },
     async (request, reply) => {
       const portfolio = await app.prisma.portfolio.findFirst({
@@ -172,7 +239,7 @@ const portfoliosRoutes: FastifyPluginAsync = async (fastify) => {
       const assetId = asset.id;
 
       // Record the transaction and move the holding atomically.
-      return app.prisma.$transaction(async (tx) => {
+      const created = await app.prisma.$transaction(async (tx) => {
         const transaction = await tx.transaction.create({
           data: {
             portfolioId: request.params.id,
@@ -195,6 +262,7 @@ const portfoliosRoutes: FastifyPluginAsync = async (fastify) => {
 
         return transaction;
       });
+      return reply.status(201).send(created);
     },
   );
 
@@ -202,7 +270,7 @@ const portfoliosRoutes: FastifyPluginAsync = async (fastify) => {
     "/portfolios/:id/transactions/:txId",
     {
       preHandler: app.authenticate,
-      schema: { params: transactionParams, body: updateTransactionBody },
+      schema: { params: transactionParams, body: updateTransactionBody, response: { 200: transactionResponse, 404: errorResponse } },
     },
     async (request, reply) => {
       const portfolio = await app.prisma.portfolio.findFirst({

@@ -8,7 +8,7 @@
  *
  * Usage:
  *   cd apps/server
- *   pnpm tsx scripts/import-portfolio.ts <path-to-csv> [user-email]
+ *   pnpm tsx scripts/import-portfolio.ts <path-to-csv> <user-email>
  *
  * - Looks up the user's default portfolio (or the first one found).
  * - For each row: upserts the Asset (fetching metadata from Yahoo Finance),
@@ -22,10 +22,10 @@ import readline from "node:readline";
 import prisma from "../src/prisma";
 import { fetchQuote } from "../src/services/yahoo-finance";
 
-const [, , csvPath, userEmail = "garistozm@gmail.com"] = process.argv;
+const [, , csvPath, userEmail] = process.argv;
 
-if (!csvPath) {
-  console.error("Usage: pnpm tsx scripts/import-portfolio.ts <path-to-csv> [user-email]");
+if (!csvPath || !userEmail) {
+  console.error("Usage: pnpm tsx scripts/import-portfolio.ts <path-to-csv> <user-email>");
   process.exit(1);
 }
 
@@ -157,8 +157,8 @@ async function main() {
   await prisma.$disconnect();
 }
 
-main().catch((err) => {
+main().catch(async (err: unknown) => {
   console.error(err);
-  prisma.$disconnect();
+  await prisma.$disconnect();
   process.exit(1);
 });

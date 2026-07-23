@@ -1,43 +1,59 @@
 import type { FastifyPluginAsync } from "fastify";
-import prisma from "../prisma";
+import type { PrismaClient } from "@prisma/client";
+import type { ZodTypeProvider } from "fastify-type-provider-zod";
+import { z } from "zod";
 import { fetchQuote, toArsTicker } from "../services/yahoo-finance";
 import getMepRate from "../services/mep";
 
 const CACHE_TTL_MS = 15 * 60 * 1000;
 
-const pricesRoutes: FastifyPluginAsync = async (app) => {
-  app.get<{ Querystring: { tickers?: string; currency?: string } }>(
-    "/prices",
-    { preHandler: app.verifyInternalSecret },
-    async (request, reply) => {
-      const { tickers, currency } = request.query;
+// Each cache-miss symbol fans out into a Yahoo fetch plus DB writes; cap the
+// batch so one request can't amplify into an unbounded number of outbound calls.
+const MAX_TICKERS = 50;
 
-      if (!tickers) {
-        return reply.status(400).send({ error: "tickers query param is required" });
-      }
+const pricesQuery = z.object({
+  tickers: z.string().min(1, "tickers query param is required"),
+  currency: z.string().optional(),
+});
 
-      // CEDEARs are tracked in USD; request `?currency=ARS` to fetch the D-stripped ticker.
-      const ars = currency?.toUpperCase() === "ARS";
+const pricesRoutes: FastifyPluginAsync = async (fastify) => {
+  const app = fastify.withTypeProvider<ZodTypeProvider>();
 
-      const symbols = tickers
-        .split(",")
-        .map((t) => t.trim())
-        .filter(Boolean);
+  app.get("/prices", { preHandler: app.verifyInternalSecret, schema: { querystring: pricesQuery } }, async (request, reply) => {
+    const { tickers, currency } = request.query;
 
-      const settled = await Promise.allSettled(symbols.map((s) => getPriceWithCache(s, ars)));
-      const results = settled.map((result, i) =>
-        result.status === "fulfilled"
-          ? result.value
-          : { ticker: symbols[i], error: result.reason instanceof Error ? result.reason.message : "Unknown error" },
-      );
-      return results;
-    },
-  );
+    // CEDEARs are tracked in USD; request `?currency=ARS` to fetch the D-stripped ticker.
+    const ars = currency?.toUpperCase() === "ARS";
+
+    const symbols = tickers
+      .split(",")
+      .map((t) => t.trim())
+      .filter(Boolean);
+
+    if (symbols.length === 0) {
+      return reply.status(400).send({ error: "tickers query param is required" });
+    }
+    if (symbols.length > MAX_TICKERS) {
+      return reply.status(400).send({ error: `Too many tickers (max ${String(MAX_TICKERS)})` });
+    }
+
+    // One MEP fetch per request: used to convert crypto USD prices, and echoed
+    // back so callers can convert USD-denominated cost bases to ARS themselves.
+    const mepRate = ars ? await getMepRate(new Date()) : null;
+
+    const settled = await Promise.allSettled(symbols.map((s) => getPriceWithCache(app.prisma, s, ars, mepRate)));
+    const results = settled.map((result, i) =>
+      result.status === "fulfilled"
+        ? { ...result.value, ...(mepRate != null && { mepRate: mepRate.toString() }) }
+        : { ticker: symbols[i], error: result.reason instanceof Error ? result.reason.message : "Unknown error" },
+    );
+    return results;
+  });
 };
 
 export default pricesRoutes;
 
-async function getPriceWithCache(symbol: string, ars: boolean) {
+async function getPriceWithCache(prisma: PrismaClient, symbol: string, ars: boolean, mepRate: number | null) {
   // Fetch/cache under the actually-quoted ticker (e.g. SPY.BA for ARS), but
   // always respond keyed by the requested ticker so callers can match results.
   // CEDEARs encode ARS as a distinct .BA ticker; crypto keeps its single USD
@@ -92,10 +108,12 @@ async function getPriceWithCache(symbol: string, ars: boolean) {
       });
       assetId = created.id;
     } else {
-      await prisma.asset.update({
-        where: { id: asset.id },
-        data: { name: quote.name },
-      });
+      if (asset.name !== quote.name) {
+        await prisma.asset.update({
+          where: { id: asset.id },
+          data: { name: quote.name },
+        });
+      }
       assetId = asset.id;
     }
 
@@ -119,11 +137,10 @@ async function getPriceWithCache(symbol: string, ars: boolean) {
 
   // Crypto is stored once in USD; convert to ARS on the fly with the MEP rate
   // when requested. (CEDEARs already came back in ARS via their .BA ticker.)
-  if (ars && assetType === "CRYPTOCURRENCY" && result.currency === "USD") {
-    const rate = await getMepRate(new Date());
+  if (ars && mepRate != null && assetType === "CRYPTOCURRENCY" && result.currency === "USD") {
     return {
       ...result,
-      price: (Number(result.price) * rate).toString(),
+      price: (Number(result.price) * mepRate).toString(),
       currency: "ARS",
     };
   }
