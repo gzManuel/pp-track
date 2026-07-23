@@ -2,7 +2,7 @@ import { timingSafeEqual } from "node:crypto";
 import fp from "fastify-plugin";
 import type { FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
-import { env } from "../env";
+import { env } from "../env.js";
 
 declare module "fastify" {
   interface FastifyInstance {

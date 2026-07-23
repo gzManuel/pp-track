@@ -6,13 +6,13 @@ import {
   validatorCompiler,
 } from "fastify-type-provider-zod";
 // `env` transitively loads dotenv, so it must stay the first project import.
-import { env } from "./env";
-import prismaPlugin from "./plugins/prisma";
-import authPlugin from "./plugins/auth";
-import pricesRoutes from "./routes/prices";
-import usersRoutes from "./routes/users";
-import portfoliosRoutes from "./routes/portfolios";
-import assetsRoutes from "./routes/assets";
+import { env } from "./env.js";
+import prismaPlugin from "./plugins/prisma.js";
+import authPlugin from "./plugins/auth.js";
+import pricesRoutes from "./routes/prices.js";
+import usersRoutes from "./routes/users.js";
+import portfoliosRoutes from "./routes/portfolios.js";
+import assetsRoutes from "./routes/assets.js";
 
 const app = Fastify({ logger: true });
 
@@ -28,7 +28,7 @@ app.setErrorHandler((error: FastifyError, request, reply) => {
   if (hasZodFastifySchemaValidationErrors(error)) {
     return reply.status(400).send({
       error: "Validation failed",
-      issues: error.validation.map((issue) => ({
+      issues: error.validation.map((issue: { instancePath: string; message?: string }) => ({
         path: issue.instancePath,
         message: issue.message ?? "Invalid value",
       })),

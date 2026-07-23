@@ -2,8 +2,8 @@ import type { FastifyPluginAsync } from "fastify";
 import { Prisma, type PrismaClient } from "@prisma/client";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
-import { fetchQuote, toArsTicker } from "../services/yahoo-finance";
-import getMepRate from "../services/mep";
+import { fetchQuote, toArsTicker } from "../services/yahoo-finance.js";
+import getMepRate from "../services/mep.js";
 
 const CACHE_TTL_MS = 15 * 60 * 1000;
 

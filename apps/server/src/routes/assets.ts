@@ -1,7 +1,7 @@
 import type { FastifyPluginAsync } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
-import { searchSymbols } from "../services/yahoo-finance";
+import { searchSymbols } from "../services/yahoo-finance.js";
 
 const searchQuery = z.object({ q: z.string().min(1) });
 

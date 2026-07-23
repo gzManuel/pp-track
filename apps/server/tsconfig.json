@@ -1,14 +1,9 @@
 {
   "extends": "@repo/typescript-config/base.json",
   "compilerOptions": {
-    "module": "esnext",
-    "moduleResolution": "bundler",
     "outDir": "dist",
     "rootDir": "src",
     "types": ["node"]
-  },
-  "tsc-alias": {
-    "resolveFullPaths": true
   },
   "include": ["src"],
   "exclude": ["node_modules", "dist"]
