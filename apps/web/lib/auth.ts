@@ -3,7 +3,11 @@ import { getServerSession } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
 import FacebookProvider from "next-auth/providers/facebook";
 import { redirect } from "next/navigation";
-import { serverFetch } from "./server-api";
+import { requireEnv, serverFetch } from "./server-api";
+
+// `next build` imports this module without runtime secrets — skip the fail-fast
+// env checks there; they run for real when the server boots/serves.
+const isBuildPhase = process.env.NEXT_PHASE === "phase-production-build";
 
 // Register only the OAuth providers whose credentials are actually configured,
 // so running with just one set up (e.g. only Google in local dev) doesn't force
@@ -29,18 +33,31 @@ function configuredProviders(): NextAuthOptions["providers"] {
     );
   }
 
+  // Zero providers means sign-in is silently impossible — make it loud instead
+  // of a mystery.
+  if (providers.length === 0 && !isBuildPhase) {
+    console.warn("[auth] No OAuth providers configured — set GOOGLE_* or FACEBOOK_* env vars; sign-in is impossible without one.");
+  }
+
   return providers;
 }
 
 export const authOptions: NextAuthOptions = {
   providers: configuredProviders(),
+  // Fail fast on a missing secret: next-auth v4 would otherwise only throw
+  // lazily at the first production request (and silently generate one in dev).
+  secret: isBuildPhase ? process.env.NEXTAUTH_SECRET : requireEnv("NEXTAUTH_SECRET"),
   session: {
     strategy: "jwt",
+    // Deliberately shorter than the 30-day default — this app shows finances.
+    maxAge: 7 * 24 * 60 * 60,
   },
   pages: {
     // The landing page hosts the app's sign-in UI; without this, protected
-    // routes bounce to next-auth's unstyled built-in sign-in page.
+    // routes bounce to next-auth's unstyled built-in pages (and auth callback
+    // failures land on its default error page).
     signIn: "/",
+    error: "/",
   },
   callbacks: {
     async jwt({ token, user }) {
