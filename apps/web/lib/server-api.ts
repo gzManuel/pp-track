@@ -56,6 +56,9 @@ export function serverFetch(path: string, options: ServerFetchOptions = {}): Pro
     ...init,
     headers: {
       "x-internal-secret": requireEnv("INTERNAL_API_SECRET"),
+      // Correlates this call with the backend's logs (Fastify adopts it as the
+      // request id via `requestIdHeader`).
+      "x-request-id": crypto.randomUUID(),
       ...(userId !== undefined ? { "x-user-id": userId } : {}),
       ...headers,
     },

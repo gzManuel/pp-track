@@ -12,6 +12,7 @@ const envSchema = z.object({
   INTERNAL_API_SECRET: z.string().min(1, "INTERNAL_API_SECRET is required"),
   PORT: z.coerce.number().int().positive().default(3001),
   HOST: z.string().min(1).default("0.0.0.0"),
+  LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace"]).default("info"),
 });
 
 const parsed = envSchema.safeParse(process.env);

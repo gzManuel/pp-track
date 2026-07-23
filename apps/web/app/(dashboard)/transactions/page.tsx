@@ -39,11 +39,13 @@ export default async function TransactionsPage({ searchParams }: { searchParams:
   // Fetch per portfolio (no aggregate endpoint), tag each transaction with its
   // portfolio so the table can label rows and target deletes correctly, then
   // re-sort the merged list since each portfolio's list is sorted on its own.
+  // The API paginates; the page shows the most recent 200 per portfolio (a
+  // "load more" flow can consume nextCursor later if history outgrows this).
   const txLists = await Promise.all(
     selectedPortfolios.map((p) =>
-      serverFetchJson<Transaction[]>(`/api/portfolios/${p.id}/transactions`, { userId }).then((txs) =>
-        txs.map((tx) => ({ ...tx, portfolioId: p.id, portfolioName: p.name })),
-      ),
+      serverFetchJson<{ items: Transaction[]; nextCursor: string | null }>(`/api/portfolios/${p.id}/transactions?take=200`, {
+        userId,
+      }).then(({ items }) => items.map((tx) => ({ ...tx, portfolioId: p.id, portfolioName: p.name }))),
     ),
   );
   const transactions = txLists.flat().sort((a, b) => new Date(b.transactedAt).getTime() - new Date(a.transactedAt).getTime());

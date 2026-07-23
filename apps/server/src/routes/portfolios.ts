@@ -14,6 +14,13 @@ const createPortfolioBody = z.object({
   name: z.string().min(1),
 });
 
+// Cursor pagination for the transactions list — the only unbounded-cardinality
+// collection in the API.
+const transactionsListQuery = z.object({
+  take: z.coerce.number().int().min(1).max(200).default(100),
+  cursor: z.uuid().optional(),
+});
+
 // Exported for schema-level tests (date anchoring, type normalization).
 export const createTransactionBody = z.object({
   ticker: z.string().min(1),
@@ -231,7 +238,14 @@ const portfoliosRoutes: FastifyPluginAsync = async (fastify) => {
     "/portfolios/:id/transactions",
     {
       preHandler: app.authenticate,
-      schema: { params: portfolioParams, response: { 200: z.array(transactionResponse), 404: errorResponse } },
+      schema: {
+        params: portfolioParams,
+        querystring: transactionsListQuery,
+        response: {
+          200: z.object({ items: z.array(transactionResponse), nextCursor: z.uuid().nullable() }),
+          404: errorResponse,
+        },
+      },
     },
     async (request, reply) => {
       const portfolio = await app.prisma.portfolio.findFirst({
@@ -241,11 +255,20 @@ const portfoliosRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.status(404).send({ error: "Portfolio not found" });
       }
 
-      return app.prisma.transaction.findMany({
+      const { take, cursor } = request.query;
+      // Fetch one extra row to know whether another page exists. `id` breaks
+      // ordering ties so the cursor is stable.
+      const rows = await app.prisma.transaction.findMany({
         where: { portfolioId: request.params.id },
         include: { asset: { select: { ticker: true, name: true } } },
-        orderBy: [{ transactedAt: "desc" }, { createdAt: "desc" }],
+        orderBy: [{ transactedAt: "desc" }, { createdAt: "desc" }, { id: "desc" }],
+        take: take + 1,
+        ...(cursor !== undefined && { cursor: { id: cursor }, skip: 1 }),
       });
+
+      const items = rows.slice(0, take);
+      const nextCursor = rows.length > take ? (items.at(-1)?.id ?? null) : null;
+      return { items, nextCursor };
     },
   );
 
@@ -395,7 +418,7 @@ const portfoliosRoutes: FastifyPluginAsync = async (fastify) => {
 
   app.delete(
     "/portfolios/:id/transactions/:txId",
-    { preHandler: app.authenticate, schema: { params: transactionParams } },
+    { preHandler: app.authenticate, schema: { params: transactionParams, response: { 204: z.null(), 404: errorResponse } } },
     async (request, reply) => {
       const portfolio = await app.prisma.portfolio.findFirst({
         where: { id: request.params.id, userId: request.userId },
@@ -419,7 +442,7 @@ const portfoliosRoutes: FastifyPluginAsync = async (fastify) => {
         await tx.transaction.delete({ where: { id: transaction.id } });
       });
 
-      return reply.status(204).send();
+      return reply.status(204).send(null);
     },
   );
 };

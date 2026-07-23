@@ -19,39 +19,63 @@ const pricesQuery = z.object({
   currency: z.string().optional(),
 });
 
+// Batch items are a success/error union; the schema whitelists exactly the
+// fields either shape may carry.
+const priceItem = z.object({
+  ticker: z.string().optional(),
+  price: z.string().optional(),
+  currency: z.string().optional(),
+  recordedAt: z.date().optional(),
+  cached: z.boolean().optional(),
+  mepRate: z.string().optional(),
+  error: z.string().optional(),
+});
+
+const errorResponse = z.object({ error: z.string() });
+
 const pricesRoutes: FastifyPluginAsync = async (fastify) => {
   const app = fastify.withTypeProvider<ZodTypeProvider>();
 
-  app.get("/prices", { preHandler: app.verifyInternalSecret, schema: { querystring: pricesQuery } }, async (request, reply) => {
-    const { tickers, currency } = request.query;
+  app.get(
+    "/prices",
+    {
+      preHandler: app.verifyInternalSecret,
+      // Expensive route (up to 50 outbound fetches per call) — tighter than the
+      // global backstop.
+      config: { rateLimit: { max: 60, timeWindow: "1 minute" } },
+      schema: { querystring: pricesQuery, response: { 200: z.array(priceItem), 400: errorResponse } },
+    },
+    async (request, reply) => {
+      const { tickers, currency } = request.query;
 
-    // CEDEARs are tracked in USD; request `?currency=ARS` to fetch the D-stripped ticker.
-    const ars = currency?.toUpperCase() === "ARS";
+      // CEDEARs are tracked in USD; request `?currency=ARS` to fetch the D-stripped ticker.
+      const ars = currency?.toUpperCase() === "ARS";
 
-    const symbols = tickers
-      .split(",")
-      .map((t) => t.trim())
-      .filter(Boolean);
+      const symbols = tickers
+        .split(",")
+        .map((t) => t.trim())
+        .filter(Boolean);
 
-    if (symbols.length === 0) {
-      return reply.status(400).send({ error: "tickers query param is required" });
-    }
-    if (symbols.length > MAX_TICKERS) {
-      return reply.status(400).send({ error: `Too many tickers (max ${String(MAX_TICKERS)})` });
-    }
+      if (symbols.length === 0) {
+        return reply.status(400).send({ error: "tickers query param is required" });
+      }
+      if (symbols.length > MAX_TICKERS) {
+        return reply.status(400).send({ error: `Too many tickers (max ${String(MAX_TICKERS)})` });
+      }
 
-    // One MEP fetch per request: used to convert crypto USD prices, and echoed
-    // back so callers can convert USD-denominated cost bases to ARS themselves.
-    const mepRate = ars ? await getMepRate(new Date()) : null;
+      // One MEP fetch per request: used to convert crypto USD prices, and echoed
+      // back so callers can convert USD-denominated cost bases to ARS themselves.
+      const mepRate = ars ? await getMepRate(new Date()) : null;
 
-    const settled = await Promise.allSettled(symbols.map((s) => getPriceWithCache(app.prisma, s, ars, mepRate)));
-    const results = settled.map((result, i) =>
-      result.status === "fulfilled"
-        ? { ...result.value, ...(mepRate != null && { mepRate: mepRate.toString() }) }
-        : { ticker: symbols[i], error: result.reason instanceof Error ? result.reason.message : "Unknown error" },
-    );
-    return results;
-  });
+      const settled = await Promise.allSettled(symbols.map((s) => getPriceWithCache(app.prisma, s, ars, mepRate)));
+      const results = settled.map((result, i) =>
+        result.status === "fulfilled"
+          ? { ...result.value, ...(mepRate != null && { mepRate: mepRate.toString() }) }
+          : { ticker: symbols[i], error: result.reason instanceof Error ? result.reason.message : "Unknown error" },
+      );
+      return results;
+    },
+  );
 };
 
 export default pricesRoutes;

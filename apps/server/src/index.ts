@@ -1,4 +1,5 @@
 import Fastify, { type FastifyError } from "fastify";
+import rateLimit from "@fastify/rate-limit";
 import {
   hasZodFastifySchemaValidationErrors,
   isResponseSerializationError,
@@ -14,7 +15,17 @@ import usersRoutes from "./routes/users.js";
 import portfoliosRoutes from "./routes/portfolios.js";
 import assetsRoutes from "./routes/assets.js";
 
-const app = Fastify({ logger: true });
+const app = Fastify({
+  logger: {
+    level: env.LOG_LEVEL,
+    // Auth material must never land in logs, even if request logging gets
+    // more verbose later.
+    redact: ["req.headers['x-internal-secret']", "req.headers['x-user-id']"],
+  },
+  // Trust the caller's request id (the web app sends one per request) so a
+  // user-facing failure can be correlated across both apps' logs.
+  requestIdHeader: "x-request-id",
+});
 
 // #1 — Teach Fastify to validate/serialize using Zod schemas.
 app.setValidatorCompiler(validatorCompiler);
@@ -50,6 +61,9 @@ app.setErrorHandler((error: FastifyError, request, reply) => {
 });
 
 // #2/#3 — Register cross-cutting plugins before the routes that use them.
+// Global rate limit is a generous backstop; hot/expensive routes override it
+// with tighter per-route configs.
+await app.register(rateLimit, { max: 300, timeWindow: "1 minute" });
 await app.register(prismaPlugin);
 await app.register(authPlugin);
 
@@ -58,7 +72,8 @@ app.register(usersRoutes, { prefix: "/api" });
 app.register(portfoliosRoutes, { prefix: "/api" });
 app.register(assetsRoutes, { prefix: "/api" });
 
-app.get("/health", async (request, reply) => {
+// Unauthenticated and it touches the DB — keep the limit tight.
+app.get("/health", { config: { rateLimit: { max: 30, timeWindow: "1 minute" } } }, async (request, reply) => {
   try {
     await app.prisma.$queryRaw`SELECT 1`;
     return { status: "ok" };
