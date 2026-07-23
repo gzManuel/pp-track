@@ -9,6 +9,11 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export default tseslint.config(
   ...baseConfig,
   {
+    // CommonJS by design (pm2 reads it as CJS); the flat config's ESM globals
+    // would flag `module`/`__dirname`.
+    ignores: ["ecosystem.config.cjs"],
+  },
+  {
     // Anchor the TS project root for EVERY file this config lints — not just the
     // type-checked `src` glob below, but also this config file, scripts/, etc.
     // Without an explicit root, typescript-eslint auto-detects it and, seeing

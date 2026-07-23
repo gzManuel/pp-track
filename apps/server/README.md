@@ -31,7 +31,7 @@ pnpm migrate            # prisma migrate dev (apply + regenerate client)
 pnpm migrate:deploy     # prisma migrate deploy (production, no prompts)
 pnpm lint               # eslint (max-warnings 0)
 pnpm check-types        # tsc --noEmit
-pnpm import-portfolio   # import scripts/portfolio.csv into the database
+pnpm import-portfolio <path-to-csv> <user-email>   # CSV importer (you supply the CSV — see scripts/import-portfolio.ts for the format)
 ```
 
 Direct Prisma access (e.g. `pnpm prisma studio`, `pnpm prisma generate`) works from this directory too.

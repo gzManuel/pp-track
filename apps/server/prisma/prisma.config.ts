@@ -17,6 +17,7 @@ export default defineConfig({
   schema: path.resolve(configDir, "schema.prisma"),
   migrations: {
     path: path.resolve(configDir, "migrations"),
+    seed: `tsx ${path.resolve(configDir, "seed.ts")}`,
   },
   datasource: {
     url: env<Env>("DATABASE_URL"),

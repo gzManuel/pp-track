@@ -12,8 +12,37 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # This repo has leaked a secret before — scan every push/PR for new ones.
+  secrets-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   verify:
     runs-on: ubuntu-latest
+    services:
+      # Throwaway Postgres so migrations are validated in CI instead of being
+      # first exercised during the production deploy.
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: pp_track_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://ci:ci@localhost:5432/pp_track_ci
     steps:
       - uses: actions/checkout@v4
 
@@ -47,6 +76,18 @@ jobs:
 
       - name: Test
         run: pnpm test
+
+      - name: Validate migrations
+        working-directory: apps/server
+        run: |
+          pnpm exec prisma migrate deploy --config=./prisma/prisma.config.ts
+          # Fail if schema.prisma has drifted from what the migrations produce
+          # (the CI database now reflects exactly the applied migrations).
+          pnpm exec prisma migrate diff \
+            --config ./prisma/prisma.config.ts \
+            --from-config-datasource \
+            --to-schema ./prisma/schema.prisma \
+            --exit-code
 
       - name: Format check
         run: pnpm format:check

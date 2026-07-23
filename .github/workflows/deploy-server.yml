@@ -34,11 +34,24 @@ jobs:
           script: |
             set -euo pipefail
             cd /home/deploy/pp-track
+            # Remember what is currently deployed so a failed healthcheck can
+            # roll straight back to it.
+            PREV_SHA=$(git rev-parse HEAD)
             # Deploy the exact commit CI just validated — a plain `git pull`
             # would race with any newer push to main.
             git fetch origin
             git checkout --detach ${{ github.sha }}
             pnpm install --frozen-lockfile
             pnpm --filter server build
-            cd apps/server && pnpm migrate:deploy
-            pm2 reload pp-api --update-env
+            (cd apps/server && pnpm migrate:deploy)
+            pm2 startOrReload apps/server/ecosystem.config.cjs --update-env
+            # Gate the deploy on the app actually serving: a server that
+            # crashes at boot must fail the workflow, not exit green.
+            if ! curl --fail --silent --retry 5 --retry-delay 3 --retry-all-errors http://localhost:3001/health; then
+              echo "Healthcheck failed — rolling back to $PREV_SHA"
+              git checkout --detach "$PREV_SHA"
+              pnpm install --frozen-lockfile
+              pnpm --filter server build
+              pm2 startOrReload apps/server/ecosystem.config.cjs --update-env
+              exit 1
+            fi

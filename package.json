@@ -1,6 +1,7 @@
 {
   "name": "pp-track",
   "private": true,
+  "license": "BUSL-1.1",
   "scripts": {
     "build": "turbo run build",
     "dev": "turbo run dev",

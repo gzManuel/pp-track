@@ -1,0 +1,22 @@
+# Local development Postgres. Matches the DATABASE_URL documented in
+# apps/server/.env.example:
+#   postgresql://user:password@localhost:5432/pp_track_dev
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: pp_track_dev
+    ports:
+      - "5432:5432"
+    volumes:
+      - pp_track_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d pp_track_dev"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  pp_track_pgdata:

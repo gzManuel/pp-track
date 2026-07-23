@@ -24,9 +24,13 @@ The web app talks to the server over HTTP; requests are authenticated with a sha
 
 ## Prerequisites
 
-- Node.js >= 18
+- Node.js >= 20.9 (see [`.nvmrc`](./.nvmrc))
 - pnpm 9 (`corepack enable`)
-- A running PostgreSQL instance
+- A running PostgreSQL instance — or use the bundled compose file:
+
+```sh
+docker compose up -d              # Postgres 17 on localhost:5432
+```
 
 ## Getting started
 
@@ -39,6 +43,7 @@ pnpm install
 #    apps/web/.env.local     — see apps/web/README.md
 
 # 3. Apply database migrations and generate the Prisma client
+#    (also seeds a demo user/portfolio in development)
 pnpm migrate
 
 # 4. Start all apps

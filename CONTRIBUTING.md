@@ -37,8 +37,9 @@ pnpm dev --filter=web             # frontend only (port 3000)
 pnpm dev --filter=server          # backend only (port 3001)
 ```
 
-The server needs `apps/server/.env` with a `DATABASE_URL` (PostgreSQL). Apply
-migrations from `apps/server`:
+The server needs `apps/server/.env` with a `DATABASE_URL` (PostgreSQL — a
+`docker compose up -d` at the repo root provides one). Apply migrations from
+the repo root:
 
 ```sh
 pnpm migrate
@@ -51,7 +52,8 @@ Please make sure the following pass from the repo root:
 ```sh
 pnpm lint                         # lint all packages
 pnpm check-types                  # type-check all packages
-pnpm format                       # prettier formatting
+pnpm test                         # run the vitest suites
+pnpm format:check                 # formatting check (what CI gates on)
 pnpm build                        # production build
 ```
 
