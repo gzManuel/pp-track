@@ -44,7 +44,7 @@ model Asset {
   ticker    String
   name      String
   assetType String   @map("asset_type")
-  exchange  String?
+  exchange  String   @default("")
   currency  String   @default("USD")
   metadata  Json?
   updatedAt DateTime @updatedAt @map("updated_at")

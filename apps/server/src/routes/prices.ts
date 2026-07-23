@@ -1,5 +1,5 @@
 import type { FastifyPluginAsync } from "fastify";
-import type { PrismaClient } from "@prisma/client";
+import { Prisma, type PrismaClient } from "@prisma/client";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
 import { fetchQuote, toArsTicker } from "../services/yahoo-finance";
@@ -97,15 +97,24 @@ async function getPriceWithCache(prisma: PrismaClient, symbol: string, ars: bool
 
     let assetId: string;
     if (!asset) {
-      const created = await prisma.asset.create({
-        data: {
-          ticker: fetchSymbol,
-          name: quote.name,
-          assetType: quote.quoteType,
-          exchange: quote.exchange,
-          currency: quote.currency,
-        },
-      });
+      let created;
+      try {
+        created = await prisma.asset.create({
+          data: {
+            ticker: fetchSymbol,
+            name: quote.name,
+            assetType: quote.quoteType,
+            exchange: quote.exchange ?? "",
+            currency: quote.currency,
+          },
+        });
+      } catch (error) {
+        // Lost a create race with a concurrent request — reuse its row.
+        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+          created = await prisma.asset.findFirst({ where: { ticker: fetchSymbol } });
+        }
+        if (!created) throw error;
+      }
       assetId = created.id;
     } else {
       if (asset.name !== quote.name) {
