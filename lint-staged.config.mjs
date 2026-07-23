@@ -11,6 +11,9 @@
 
 // App-root prefix of a path, e.g. `/repo/apps/web/app/page.tsx` -> `/repo/apps/web`.
 // Files outside `apps/*` don't match and are skipped (only apps have ESLint configs).
+// NOTE: this means `packages/*` get no pre-commit ESLint — fine today (they hold
+// only config files), but extend the pattern if a source package (e.g. a real
+// packages/ui) is ever added.
 const APP_ROOT_PATTERN = /^.*\/apps\/[^/]+/;
 
 // Quote each path so paths with spaces survive being spliced into a shell command.
@@ -40,9 +43,7 @@ function buildTypeScriptCommands(stagedTypeScriptFilePaths) {
   const commands = [];
 
   for (const filePathsForApp of groupStagedFilesByApp(stagedTypeScriptFilePaths).values()) {
-    commands.push(
-      `eslint --fix --flag v10_config_lookup_from_file ${toQuotedShellArguments(filePathsForApp)}`,
-    );
+    commands.push(`eslint --fix --flag v10_config_lookup_from_file ${toQuotedShellArguments(filePathsForApp)}`);
   }
 
   commands.push(`prettier --write ${toQuotedShellArguments(stagedTypeScriptFilePaths)}`);

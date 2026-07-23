@@ -12,7 +12,6 @@ Turborepo monorepo with `pnpm` workspaces:
 
 - `apps/web` — Next.js 16 frontend (React 19, Tailwind CSS v4, shadcn/ui)
 - `apps/server` — Fastify 5 backend with Prisma 7 + PostgreSQL
-- `packages/ui` — Shared React component library (`@repo/ui`)
 - `packages/eslint-config` — Shared ESLint configs
 - `packages/typescript-config` — Shared `tsconfig.json` presets
 
@@ -62,7 +61,3 @@ All monetary quantities use `Decimal(18,8)`. UUIDs are used for all primary keys
 - Tailwind CSS v4 configured via `postcss.config.mjs`; CSS variables defined in `app/globals.css`
 - Form handling uses `react-hook-form` + `zod` (via `@hookform/resolvers`)
 - Icons from `lucide-react`
-
-## Shared UI package
-
-`@repo/ui` exports components directly from source (`"exports": {"./*": "./src/*.tsx"}`). No build step — consumers import TS source directly. Add components with `pnpm generate:component` from `packages/ui/`.

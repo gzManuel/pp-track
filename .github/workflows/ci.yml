@@ -29,6 +29,16 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # Reuse Turborepo's local task cache across runs so unchanged packages
+      # skip lint/type-check/build entirely.
+      - name: Cache Turborepo
+        uses: actions/cache@v4
+        with:
+          path: .turbo
+          key: turbo-${{ runner.os }}-${{ github.sha }}
+          restore-keys: |
+            turbo-${{ runner.os }}-
+
       - name: Lint
         run: pnpm lint
 

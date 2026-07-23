@@ -17,7 +17,6 @@ A portfolio tracking application. Track investments across multiple portfolios, 
 
 - **[`apps/web`](./apps/web)** — Next.js 16 frontend (React 19, Tailwind CSS v4, shadcn/ui, NextAuth)
 - **[`apps/server`](./apps/server)** — Fastify 5 backend with Prisma 7 + PostgreSQL
-- **`packages/ui`** — Shared React component library (`@repo/ui`)
 - **`packages/eslint-config`** — Shared ESLint configs
 - **`packages/typescript-config`** — Shared `tsconfig.json` presets
 
