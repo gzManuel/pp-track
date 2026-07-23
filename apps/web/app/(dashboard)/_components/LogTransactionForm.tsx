@@ -1,7 +1,7 @@
 "use client";
 
 import { useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toTransactionPayload, transactionFormSchema, type TransactionFormValues } from "@/lib/schemas";
@@ -40,7 +40,6 @@ export default function LogTransactionForm({
   onSuccess?: () => void;
 }) {
   const [isPending, startTransition] = useTransition();
-  const router = useRouter();
   const submitLabel = transaction ? "Save changes" : "Save transaction";
 
   const form = useForm<FormValues>({
@@ -78,17 +77,20 @@ export default function LogTransactionForm({
       const { portfolioId } = values;
       const payload = toTransactionPayload(values);
 
-      if (transaction) {
-        await updateTransaction(transaction.portfolioId, transaction.id, {
-          ...payload,
-          portfolioId,
-        });
-      } else {
-        await logTransaction(portfolioId, payload);
-        form.reset();
+      // Failures come back as a result (not a throw) so the form stays mounted
+      // and the user's input survives — surfaced as a toast + inline message.
+      const result = transaction
+        ? await updateTransaction(transaction.portfolioId, transaction.id, { ...payload, portfolioId })
+        : await logTransaction(portfolioId, payload);
+
+      if (!result.ok) {
+        form.setError("root", { message: result.error });
+        toast.error(result.error);
+        return;
       }
 
-      router.refresh();
+      toast.success(transaction ? "Transaction updated" : "Transaction logged");
+      if (!transaction) form.reset();
       onSuccess?.();
     });
   }
@@ -251,6 +253,12 @@ export default function LogTransactionForm({
             </FormItem>
           )}
         />
+
+        {form.formState.errors.root && (
+          <p role="alert" className="text-sm text-destructive">
+            {form.formState.errors.root.message}
+          </p>
+        )}
 
         <Button type="submit" disabled={isPending} className="self-start">
           {isPending ? "Saving..." : submitLabel}

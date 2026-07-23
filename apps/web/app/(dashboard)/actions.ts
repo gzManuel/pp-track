@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { getServerSession } from "next-auth";
 import { z } from "zod";
 import { authOptions } from "@/lib/auth";
@@ -16,6 +17,35 @@ const JSON_HEADERS = { "Content-Type": "application/json" };
 
 // Server actions are public HTTP endpoints — every input is re-validated here
 // with the shared schemas, regardless of what the client-side forms enforce.
+//
+// Mutations return an ActionResult instead of throwing: a thrown error inside a
+// client transition unmounts the page into the route error boundary (losing the
+// user's form input), while a returned failure lets the caller keep the dialog
+// open and show a toast/inline message.
+
+export type ActionResult = { ok: true } | { ok: false; error: string };
+
+/**
+ * Message for a failed backend response. Business-rule rejections (422, e.g.
+ * overselling) carry a user-appropriate message from the API — surface it.
+ * Everything else gets the generic fallback so internals never reach the UI.
+ */
+async function failureMessage(res: Response, fallback: string): Promise<string> {
+  if (res.status === 422) {
+    const body = (await res.json().catch(() => null)) as { error?: string } | null;
+    if (body?.error) return body.error;
+  }
+  return fallback;
+}
+
+// Every mutation can change holdings/transactions/portfolio summaries, so all
+// three views are revalidated together — cheap, and callers never see stale
+// data on their next navigation.
+function revalidateAppViews() {
+  revalidatePath("/dashboard");
+  revalidatePath("/transactions");
+  revalidatePath("/portfolios");
+}
 
 export interface TickerSearchResult {
   symbol: string;
@@ -43,7 +73,7 @@ export async function searchTickers(query: string): Promise<TickerSearchResult[]
   return (await res.json()) as TickerSearchResult[];
 }
 
-export async function createPortfolio(name: string) {
+export async function createPortfolio(name: string): Promise<ActionResult> {
   const userId = await requireUserId();
   const parsedName = portfolioNameSchema.parse(name);
 
@@ -54,10 +84,12 @@ export async function createPortfolio(name: string) {
     userId,
   });
 
-  if (!res.ok) throw new Error("Failed to create portfolio");
+  if (!res.ok) return { ok: false, error: await failureMessage(res, "Failed to create portfolio") };
+  revalidateAppViews();
+  return { ok: true };
 }
 
-export async function logTransaction(portfolioId: string, data: TransactionPayload) {
+export async function logTransaction(portfolioId: string, data: TransactionPayload): Promise<ActionResult> {
   const userId = await requireUserId();
   const id = z.uuid().parse(portfolioId);
   const payload = transactionPayloadSchema.parse(data);
@@ -69,10 +101,12 @@ export async function logTransaction(portfolioId: string, data: TransactionPaylo
     userId,
   });
 
-  if (!res.ok) throw new Error("Failed to log transaction");
+  if (!res.ok) return { ok: false, error: await failureMessage(res, "Failed to log transaction") };
+  revalidateAppViews();
+  return { ok: true };
 }
 
-export async function updateTransaction(portfolioId: string, txId: string, data: UpdateTransactionPayload) {
+export async function updateTransaction(portfolioId: string, txId: string, data: UpdateTransactionPayload): Promise<ActionResult> {
   const userId = await requireUserId();
   const id = z.uuid().parse(portfolioId);
   const tx = z.uuid().parse(txId);
@@ -85,10 +119,12 @@ export async function updateTransaction(portfolioId: string, txId: string, data:
     userId,
   });
 
-  if (!res.ok) throw new Error("Failed to update transaction");
+  if (!res.ok) return { ok: false, error: await failureMessage(res, "Failed to update transaction") };
+  revalidateAppViews();
+  return { ok: true };
 }
 
-export async function deleteTransaction(portfolioId: string, txId: string) {
+export async function deleteTransaction(portfolioId: string, txId: string): Promise<ActionResult> {
   const userId = await requireUserId();
   const id = z.uuid().parse(portfolioId);
   const tx = z.uuid().parse(txId);
@@ -99,5 +135,7 @@ export async function deleteTransaction(portfolioId: string, txId: string) {
     userId,
   });
 
-  if (!res.ok) throw new Error("Failed to delete transaction");
+  if (!res.ok) return { ok: false, error: await failureMessage(res, "Failed to delete transaction") };
+  revalidateAppViews();
+  return { ok: true };
 }

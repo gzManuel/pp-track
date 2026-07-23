@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { Button } from "@/components/shadcn/Button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/shadcn/Dialog";
 import { Input } from "@/components/shadcn/Input";
@@ -12,17 +12,21 @@ export default function CreatePortfolioDialog() {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [isPending, startTransition] = useTransition();
-  const router = useRouter();
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!name.trim()) return;
 
     startTransition(async () => {
-      await createPortfolio(name.trim());
+      const result = await createPortfolio(name.trim());
+      if (!result.ok) {
+        // Keep the dialog open so the typed name isn't lost.
+        toast.error(result.error);
+        return;
+      }
+      toast.success("Portfolio created");
       setOpen(false);
       setName("");
-      router.refresh();
     });
   }
 

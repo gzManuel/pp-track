@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { Trash2 } from "lucide-react";
 import { Button } from "@/components/shadcn/Button";
 import {
@@ -19,13 +19,16 @@ import { deleteTransaction } from "../actions";
 export default function DeleteTransactionButton({ portfolioId, txId, label }: { portfolioId: string; txId: string; label: string }) {
   const [open, setOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
-  const router = useRouter();
 
   function handleDelete() {
     startTransition(async () => {
-      await deleteTransaction(portfolioId, txId);
+      const result = await deleteTransaction(portfolioId, txId);
+      if (!result.ok) {
+        toast.error(result.error);
+        return;
+      }
+      toast.success("Transaction deleted");
       setOpen(false);
-      router.refresh();
     });
   }
 
