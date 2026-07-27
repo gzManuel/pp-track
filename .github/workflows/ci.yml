@@ -61,7 +61,7 @@ jobs:
       # Reuse Turborepo's local task cache across runs so unchanged packages
       # skip lint/type-check/build entirely.
       - name: Cache Turborepo
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: .turbo
           key: turbo-${{ runner.os }}-${{ github.sha }}
