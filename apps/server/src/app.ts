@@ -14,6 +14,7 @@ import authPlugin from "./plugins/auth.js";
 import pricesRoutes from "./routes/prices.js";
 import usersRoutes from "./routes/users.js";
 import portfoliosRoutes from "./routes/portfolios.js";
+import transactionsRoutes from "./routes/transactions.js";
 import assetsRoutes from "./routes/assets.js";
 
 export interface BuildAppOptions {
@@ -90,6 +91,7 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
   await app.register(pricesRoutes, { prefix: "/api" });
   await app.register(usersRoutes, { prefix: "/api" });
   await app.register(portfoliosRoutes, { prefix: "/api" });
+  await app.register(transactionsRoutes, { prefix: "/api" });
   await app.register(assetsRoutes, { prefix: "/api" });
 
   // Unauthenticated and it touches the DB — keep the limit tight.
