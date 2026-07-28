@@ -2,9 +2,9 @@ import { getUserId } from "@/lib/auth";
 import { serverFetchJson } from "@/lib/server-api";
 import { parsePortfolioSelection } from "@/lib/portfolio-selection";
 import type { Portfolio, TransactionPage } from "@/lib/types";
-import LogTransactionForm from "../_components/LogTransactionForm";
-import PortfolioSwitcher from "../_components/PortfolioSwitcher";
-import TransactionsTable from "../_components/TransactionsTable";
+import LogTransactionForm from "../_components/transactions/LogTransactionForm";
+import PortfolioSwitcher from "../_components/portfolio/PortfolioSwitcher";
+import TransactionsTable from "../_components/transactions/TransactionsTable";
 
 export default async function TransactionsPage({ searchParams }: { searchParams: Promise<{ portfolio?: string }> }) {
   const userId = await getUserId();

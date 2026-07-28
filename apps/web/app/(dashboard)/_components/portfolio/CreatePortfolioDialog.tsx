@@ -6,7 +6,7 @@ import { Button } from "@/components/shadcn/Button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/shadcn/Dialog";
 import { Input } from "@/components/shadcn/Input";
 import { Label } from "@/components/shadcn/Label";
-import { createPortfolio } from "../actions";
+import { createPortfolio } from "../../actions";
 
 export default function CreatePortfolioDialog() {
   const [open, setOpen] = useState(false);

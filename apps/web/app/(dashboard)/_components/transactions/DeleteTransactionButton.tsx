@@ -14,7 +14,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/shadcn/Dialog";
-import { deleteTransaction } from "../actions";
+import { deleteTransaction } from "../../actions";
 
 export default function DeleteTransactionButton({ portfolioId, txId, label }: { portfolioId: string; txId: string; label: string }) {
   const [open, setOpen] = useState(false);

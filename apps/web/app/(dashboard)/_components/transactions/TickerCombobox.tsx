@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/shadcn/Button";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/shadcn/Command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/shadcn/Popover";
-import { searchTickers, type TickerSearchResult } from "../actions";
+import { searchTickers, type TickerSearchResult } from "../../actions";
 
 function TickerOption({
   result,
