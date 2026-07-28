@@ -3,6 +3,7 @@ import { Prisma, type PrismaClient } from "@prisma/client";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
 import { fetchQuote, toArsTicker } from "../services/yahoo-finance.js";
+import { assetSeedFromQuote, createAssetOrRecover } from "../services/assets.js";
 import getMepRate from "../services/mep.js";
 
 const CACHE_TTL_MS = 15 * 60 * 1000;
@@ -39,7 +40,7 @@ const pricesRoutes: FastifyPluginAsync = async (fastify) => {
   app.get(
     "/prices",
     {
-      preHandler: app.verifyInternalSecret,
+      onRequest: app.verifyInternalSecret,
       // Expensive route (up to 50 outbound fetches per call) — tighter than the
       // global backstop.
       config: { rateLimit: { max: 60, timeWindow: "1 minute" } },
@@ -127,27 +128,7 @@ async function getPriceWithCache(prisma: PrismaClient, symbol: string, ars: bool
 
     let assetId: string;
     if (!asset) {
-      let created;
-      try {
-        created = await prisma.asset.create({
-          data: {
-            ticker: fetchSymbol,
-            name: quote.name,
-            assetType: quote.quoteType,
-            exchange: quote.exchange ?? "",
-            currency: quote.currency,
-          },
-        });
-      } catch (error) {
-        // Lost a create race with a concurrent request — reuse exactly the
-        // colliding (ticker, exchange) row.
-        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
-          created = await prisma.asset.findUnique({
-            where: { ticker_exchange: { ticker: fetchSymbol, exchange: quote.exchange ?? "" } },
-          });
-        }
-        if (!created) throw error;
-      }
+      const created = await createAssetOrRecover(prisma, assetSeedFromQuote(fetchSymbol, quote));
       assetId = created.id;
     } else {
       if (asset.name !== quote.name) {

@@ -31,7 +31,7 @@ const assetsRoutes: FastifyPluginAsync = async (fastify) => {
   // Ticker autocomplete: the user's own assets first, then Yahoo search results.
   app.get(
     "/assets/search",
-    { preHandler: app.authenticate, schema: { querystring: searchQuery, response: { 200: z.array(searchResult) } } },
+    { onRequest: app.authenticate, schema: { querystring: searchQuery, response: { 200: z.array(searchResult) } } },
     async (request) => {
       const { q } = request.query;
 

@@ -6,7 +6,9 @@
  * Run via `pnpm exec prisma db seed --config=./prisma/prisma.config.ts`
  * (or automatically after `prisma migrate dev`/`migrate reset`).
  */
-import prisma from "../src/prisma.js";
+import { createPrismaClient } from "../src/prisma-client.js";
+
+const prisma = createPrismaClient();
 
 const DEMO_EMAIL = "demo@pp-track.local";
 

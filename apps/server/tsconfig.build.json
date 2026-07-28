@@ -1,4 +1,6 @@
 {
   "extends": "./tsconfig.json",
-  "exclude": ["node_modules", "dist", "src/**/*.test.ts"]
+  // `test-support` imports vitest (a devDependency), so it must stay out of the
+  // production build even though it isn't a `.test.ts` file itself.
+  "exclude": ["node_modules", "dist", "src/**/*.test.ts", "src/test-support/**"]
 }

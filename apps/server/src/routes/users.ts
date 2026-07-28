@@ -21,7 +21,7 @@ const usersRoutes: FastifyPluginAsync = async (fastify) => {
   app.post(
     "/users/upsert",
     {
-      preHandler: app.verifyInternalSecret,
+      onRequest: app.verifyInternalSecret,
       schema: { body: upsertUserBody, response: { 200: userResponse } },
     },
     async (request) => {

@@ -16,8 +16,8 @@ describe("auth plugin", () => {
     const { default: authPlugin } = await import("./auth.js");
     app = Fastify();
     await app.register(authPlugin);
-    app.get("/secret-only", { preHandler: app.verifyInternalSecret }, async () => ({ ok: true }));
-    app.get("/user-scoped", { preHandler: app.authenticate }, async (request) => ({ userId: request.userId }));
+    app.get("/secret-only", { onRequest: app.verifyInternalSecret }, async () => ({ ok: true }));
+    app.get("/user-scoped", { onRequest: app.authenticate }, async (request) => ({ userId: request.userId }));
     await app.ready();
   });
 

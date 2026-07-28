@@ -6,9 +6,9 @@ import { env } from "../env.js";
 
 declare module "fastify" {
   interface FastifyInstance {
-    /** preHandler that validates the internal secret + user header. */
+    /** onRequest hook that validates the internal secret + user header. */
     authenticate: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
-    /** preHandler that validates only the internal secret (non-user-scoped routes). */
+    /** onRequest hook that validates only the internal secret (non-user-scoped routes). */
     verifyInternalSecret: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
   }
   interface FastifyRequest {
@@ -37,10 +37,15 @@ function hasValidSecret(request: FastifyRequest): boolean {
 const userIdSchema = z.uuid();
 
 /**
- * Registers two preHandlers:
+ * Registers two guards:
  * - `verifyInternalSecret` guards shared, non-user-scoped routes (e.g. `/prices`).
  * - `authenticate` additionally requires an `x-user-id` and populates
  *   `request.userId`. Both reply 401 and skip the route handler on failure.
+ *
+ * Attach these as `onRequest`, not `preHandler`. They only read headers, and
+ * `onRequest` fires before body parsing and schema validation — so an
+ * unauthenticated caller gets a flat 401 instead of a 400 describing the body
+ * schema, and a bad request is rejected before its payload is even parsed.
  */
 export default fp(async (app) => {
   app.decorateRequest("userId", "");

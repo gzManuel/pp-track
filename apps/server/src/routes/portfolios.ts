@@ -2,8 +2,8 @@ import type { FastifyPluginAsync } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
-import { fetchQuote, toUsdTicker } from "../services/yahoo-finance.js";
-import getMepRate from "../services/mep.js";
+import { resolveTransactionAsset } from "../services/assets.js";
+import { requirePortfolio, requireTransaction } from "../services/authorization.js";
 import { recomputeHolding } from "../services/holdings.js";
 
 // #1 — Schemas drive both runtime validation and the inferred TS types.
@@ -100,68 +100,9 @@ const portfoliosRoutes: FastifyPluginAsync = async (fastify) => {
   // Opt this plugin's routes into Zod-typed request/reply inference.
   const app = fastify.withTypeProvider<ZodTypeProvider>();
 
-  // Resolves the asset a transaction points at, applying the CEDEAR ARS→USD
-  // conversion and creating the Asset row on first sight. Shared by create/edit
-  // so both normalize tickers and amounts identically.
-  //
-  // This runs before the holding $transaction because it may hit the network
-  // (Yahoo, MEP rate). Known tradeoff: if the later transaction fails, a
-  // just-created Asset row survives as an orphan — harmless, and it will be
-  // reused the next time the ticker appears.
-  async function resolveAsset(input: { ticker: string; price: number; currency: string; fee?: number; transactedAt: Date }) {
-    let { ticker, price, currency, fee } = input;
-
-    // CEDEARs are stored in USD. When logged in ARS against a peso ticker
-    // (e.g. SPY.BA), convert price/fee to the USD `D` variant (SPYD.BA) using
-    // the dólar MEP implied by the pair at the trade date.
-    const usdTicker = toUsdTicker(ticker);
-    if (currency.toUpperCase() === "ARS" && usdTicker !== ticker) {
-      const mep = await getMepRate(input.transactedAt);
-      price /= mep;
-      if (fee) fee /= mep;
-      ticker = usdTicker;
-      currency = "USD";
-    }
-
-    // Uniqueness is (ticker, exchange); a ticker alone can match several rows,
-    // so order deterministically instead of taking an arbitrary one.
-    let asset = await app.prisma.asset.findFirst({ where: { ticker }, orderBy: { updatedAt: "desc" } });
-    if (!asset) {
-      let data: { ticker: string; name: string; assetType: string; exchange: string; currency: string };
-      try {
-        const quote = await fetchQuote(ticker);
-        data = {
-          ticker,
-          name: quote.name,
-          assetType: quote.quoteType,
-          exchange: quote.exchange ?? "",
-          currency: quote.currency,
-        };
-      } catch {
-        // Yahoo lookup failed — register a minimal placeholder asset.
-        data = { ticker, name: ticker, assetType: "EQUITY", exchange: "", currency };
-      }
-
-      try {
-        asset = await app.prisma.asset.create({ data });
-      } catch (error) {
-        // Lost a create race: another request inserted the same (ticker, exchange)
-        // first — use exactly that row instead of failing.
-        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
-          asset = await app.prisma.asset.findUnique({
-            where: { ticker_exchange: { ticker: data.ticker, exchange: data.exchange } },
-          });
-        }
-        if (!asset) throw error;
-      }
-    }
-
-    return { asset, price, currency, fee: fee ?? 0 };
-  }
-
   // #2 — `app.authenticate` runs first and sets `request.userId`.
   // #3 — `app.prisma` is the decorated shared client (no direct import).
-  app.get("/portfolios", { preHandler: app.authenticate, schema: { response: { 200: z.array(portfolioResponse) } } }, async (request) =>
+  app.get("/portfolios", { onRequest: app.authenticate, schema: { response: { 200: z.array(portfolioResponse) } } }, async (request) =>
     app.prisma.portfolio.findMany({
       where: { userId: request.userId },
       orderBy: [{ isDefault: "desc" }, { createdAt: "asc" }],
@@ -171,7 +112,7 @@ const portfoliosRoutes: FastifyPluginAsync = async (fastify) => {
   app.post(
     "/portfolios",
     {
-      preHandler: app.authenticate,
+      onRequest: app.authenticate,
       schema: { body: createPortfolioBody, response: { 201: portfolioResponse } },
     },
     async (request, reply) => {
@@ -208,14 +149,9 @@ const portfoliosRoutes: FastifyPluginAsync = async (fastify) => {
 
   app.get(
     "/portfolios/:id/holdings",
-    { preHandler: app.authenticate, schema: { params: portfolioParams, response: { 200: z.array(holdingResponse), 404: errorResponse } } },
-    async (request, reply) => {
-      const portfolio = await app.prisma.portfolio.findFirst({
-        where: { id: request.params.id, userId: request.userId },
-      });
-      if (!portfolio) {
-        return reply.status(404).send({ error: "Portfolio not found" });
-      }
+    { onRequest: app.authenticate, schema: { params: portfolioParams, response: { 200: z.array(holdingResponse), 404: errorResponse } } },
+    async (request) => {
+      await requirePortfolio(app.prisma, request.params.id, request.userId);
 
       return app.prisma.holding.findMany({
         where: { portfolioId: request.params.id },
@@ -237,7 +173,7 @@ const portfoliosRoutes: FastifyPluginAsync = async (fastify) => {
   app.get(
     "/portfolios/:id/transactions",
     {
-      preHandler: app.authenticate,
+      onRequest: app.authenticate,
       schema: {
         params: portfolioParams,
         querystring: transactionsListQuery,
@@ -247,13 +183,8 @@ const portfoliosRoutes: FastifyPluginAsync = async (fastify) => {
         },
       },
     },
-    async (request, reply) => {
-      const portfolio = await app.prisma.portfolio.findFirst({
-        where: { id: request.params.id, userId: request.userId },
-      });
-      if (!portfolio) {
-        return reply.status(404).send({ error: "Portfolio not found" });
-      }
+    async (request) => {
+      await requirePortfolio(app.prisma, request.params.id, request.userId);
 
       const { take, cursor } = request.query;
       // Fetch one extra row to know whether another page exists. `id` breaks
@@ -275,16 +206,11 @@ const portfoliosRoutes: FastifyPluginAsync = async (fastify) => {
   app.post(
     "/portfolios/:id/transactions",
     {
-      preHandler: app.authenticate,
+      onRequest: app.authenticate,
       schema: { params: portfolioParams, body: createTransactionBody, response: { 201: transactionResponse, 404: errorResponse } },
     },
     async (request, reply) => {
-      const portfolio = await app.prisma.portfolio.findFirst({
-        where: { id: request.params.id, userId: request.userId },
-      });
-      if (!portfolio) {
-        return reply.status(404).send({ error: "Portfolio not found" });
-      }
+      await requirePortfolio(app.prisma, request.params.id, request.userId);
 
       const { type, quantity, transactedAt, notes } = request.body;
       const {
@@ -292,7 +218,7 @@ const portfoliosRoutes: FastifyPluginAsync = async (fastify) => {
         price,
         currency,
         fee: txFee,
-      } = await resolveAsset({
+      } = await resolveTransactionAsset(app.prisma, {
         ticker: request.body.ticker,
         price: request.body.price,
         currency: request.body.currency,
@@ -339,37 +265,21 @@ const portfoliosRoutes: FastifyPluginAsync = async (fastify) => {
   app.patch(
     "/portfolios/:id/transactions/:txId",
     {
-      preHandler: app.authenticate,
+      onRequest: app.authenticate,
       schema: { params: transactionParams, body: updateTransactionBody, response: { 200: transactionResponse, 404: errorResponse } },
     },
-    async (request, reply) => {
-      const portfolio = await app.prisma.portfolio.findFirst({
-        where: { id: request.params.id, userId: request.userId },
-      });
-      if (!portfolio) {
-        return reply.status(404).send({ error: "Portfolio not found" });
-      }
-
-      const existing = await app.prisma.transaction.findFirst({
-        where: { id: request.params.txId, portfolioId: request.params.id },
-      });
-      if (!existing) {
-        return reply.status(404).send({ error: "Transaction not found" });
-      }
+    async (request) => {
+      await requirePortfolio(app.prisma, request.params.id, request.userId);
+      const existing = await requireTransaction(app.prisma, request.params.txId, request.params.id);
 
       // An edit may move the transaction to another of the user's portfolios.
       const targetPortfolioId = request.body.portfolioId ?? request.params.id;
       if (targetPortfolioId !== request.params.id) {
-        const target = await app.prisma.portfolio.findFirst({
-          where: { id: targetPortfolioId, userId: request.userId },
-        });
-        if (!target) {
-          return reply.status(404).send({ error: "Target portfolio not found" });
-        }
+        await requirePortfolio(app.prisma, targetPortfolioId, request.userId, "Target portfolio not found");
       }
 
       const { type, quantity, transactedAt, notes } = request.body;
-      const { asset, price, currency, fee } = await resolveAsset({
+      const { asset, price, currency, fee } = await resolveTransactionAsset(app.prisma, {
         ticker: request.body.ticker,
         price: request.body.price,
         currency: request.body.currency,
@@ -418,23 +328,10 @@ const portfoliosRoutes: FastifyPluginAsync = async (fastify) => {
 
   app.delete(
     "/portfolios/:id/transactions/:txId",
-    { preHandler: app.authenticate, schema: { params: transactionParams, response: { 204: z.null(), 404: errorResponse } } },
+    { onRequest: app.authenticate, schema: { params: transactionParams, response: { 204: z.null(), 404: errorResponse } } },
     async (request, reply) => {
-      const portfolio = await app.prisma.portfolio.findFirst({
-        where: { id: request.params.id, userId: request.userId },
-      });
-
-      if (!portfolio) {
-        return reply.status(404).send({ error: "Portfolio not found" });
-      }
-
-      const transaction = await app.prisma.transaction.findFirst({
-        where: { id: request.params.txId, portfolioId: request.params.id },
-      });
-
-      if (!transaction) {
-        return reply.status(404).send({ error: "Transaction not found" });
-      }
+      await requirePortfolio(app.prisma, request.params.id, request.userId);
+      const transaction = await requireTransaction(app.prisma, request.params.txId, request.params.id);
 
       // Delete and rebuild the affected holding atomically.
       await app.prisma.$transaction(async (tx) => {
