@@ -2,6 +2,7 @@ import type { FastifyPluginAsync } from "fastify";
 import { Prisma, type PrismaClient } from "@prisma/client";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
+import { errorResponseSchema, priceQuerySchema, priceResultSchema } from "@repo/api-contract";
 import { fetchQuote, toArsTicker } from "../services/yahoo-finance.js";
 import { assetSeedFromQuote, createAssetOrRecover } from "../services/assets.js";
 import getMepRate from "../services/mep.js";
@@ -15,25 +16,6 @@ const SNAPSHOT_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 // batch so one request can't amplify into an unbounded number of outbound calls.
 const MAX_TICKERS = 50;
 
-const pricesQuery = z.object({
-  tickers: z.string().min(1, "tickers query param is required"),
-  currency: z.string().optional(),
-});
-
-// Batch items are a success/error union; the schema whitelists exactly the
-// fields either shape may carry.
-const priceItem = z.object({
-  ticker: z.string().optional(),
-  price: z.string().optional(),
-  currency: z.string().optional(),
-  recordedAt: z.date().optional(),
-  cached: z.boolean().optional(),
-  mepRate: z.string().optional(),
-  error: z.string().optional(),
-});
-
-const errorResponse = z.object({ error: z.string() });
-
 const pricesRoutes: FastifyPluginAsync = async (fastify) => {
   const app = fastify.withTypeProvider<ZodTypeProvider>();
 
@@ -44,7 +26,7 @@ const pricesRoutes: FastifyPluginAsync = async (fastify) => {
       // Expensive route (up to 50 outbound fetches per call) — tighter than the
       // global backstop.
       config: { rateLimit: { max: 60, timeWindow: "1 minute" } },
-      schema: { querystring: pricesQuery, response: { 200: z.array(priceItem), 400: errorResponse } },
+      schema: { querystring: priceQuerySchema, response: { 200: z.array(priceResultSchema), 400: errorResponseSchema } },
     },
     async (request, reply) => {
       const { tickers, currency } = request.query;
@@ -68,13 +50,19 @@ const pricesRoutes: FastifyPluginAsync = async (fastify) => {
       // back so callers can convert USD-denominated cost bases to ARS themselves.
       const mepRate = ars ? await getMepRate(new Date()) : null;
 
-      const settled = await Promise.allSettled(symbols.map((s) => getPriceWithCache(app.prisma, s, ars, mepRate)));
-      const results = settled.map((result, i) =>
-        result.status === "fulfilled"
-          ? { ...result.value, ...(mepRate != null && { mepRate: mepRate.toString() }) }
-          : { ticker: symbols[i], error: result.reason instanceof Error ? result.reason.message : "Unknown error" },
+      // Settle per ticker so one bad symbol can't fail the batch. Handling the
+      // failure inside the map (rather than zipping `allSettled` results back to
+      // `symbols` by index) is what guarantees every item carries its ticker.
+      return Promise.all(
+        symbols.map(async (symbol) => {
+          try {
+            const value = await getPriceWithCache(app.prisma, symbol, ars, mepRate);
+            return { ...value, ...(mepRate != null && { mepRate: mepRate.toString() }) };
+          } catch (error) {
+            return { ticker: symbol, error: error instanceof Error ? error.message : "Unknown error" };
+          }
+        }),
       );
-      return results;
     },
   );
 };

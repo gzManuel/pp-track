@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { getServerSession } from "next-auth";
 import { z } from "zod";
+import type { AssetSearchResult } from "@repo/api-contract";
 import { authOptions } from "@/lib/auth";
 import { serverFetch } from "@/lib/server-api";
 import {
@@ -47,13 +48,8 @@ function revalidateAppViews() {
   revalidatePath("/portfolios");
 }
 
-export interface TickerSearchResult {
-  symbol: string;
-  name: string;
-  exchange: string | null;
-  type: string;
-  source: "portfolio" | "yahoo";
-}
+/** Re-exported under its call-site name; the shape is the API's. */
+export type TickerSearchResult = AssetSearchResult;
 
 async function requireUserId(): Promise<string> {
   const session = await getServerSession(authOptions);

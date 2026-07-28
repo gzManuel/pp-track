@@ -1,0 +1,36 @@
+{
+  "name": "@repo/api-contract",
+  "version": "0.0.0",
+  "type": "module",
+  "private": true,
+  "license": "BUSL-1.1",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "dev": "tsc -p tsconfig.build.json --watch --preserveWatchOutput",
+    "lint": "eslint --max-warnings 0",
+    "check-types": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@repo/eslint-config": "workspace:*",
+    "@repo/typescript-config": "workspace:*",
+    "eslint": "^9.39.1",
+    "typescript": "5.9.2",
+    "typescript-eslint": "^8.50.0",
+    "vitest": "^4.1.10"
+  }
+}

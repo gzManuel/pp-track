@@ -1,19 +1,6 @@
 import type { FastifyPluginAsync } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
-import { z } from "zod";
-
-const upsertUserBody = z.object({
-  email: z.email(),
-  name: z.string().max(200).optional(),
-  image: z.url().optional(),
-});
-
-const userResponse = z.object({
-  id: z.uuid(),
-  email: z.string(),
-  name: z.string(),
-  image: z.string().nullable(),
-});
+import { upsertUserRequestSchema, userSchema } from "@repo/api-contract";
 
 const usersRoutes: FastifyPluginAsync = async (fastify) => {
   const app = fastify.withTypeProvider<ZodTypeProvider>();
@@ -22,7 +9,7 @@ const usersRoutes: FastifyPluginAsync = async (fastify) => {
     "/users/upsert",
     {
       onRequest: app.verifyInternalSecret,
-      schema: { body: upsertUserBody, response: { 200: userResponse } },
+      schema: { body: upsertUserRequestSchema, response: { 200: userSchema } },
     },
     async (request) => {
       const { email, name, image } = request.body;

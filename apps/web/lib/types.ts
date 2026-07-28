@@ -1,46 +1,34 @@
 /**
- * Shared API/domain types for data coming from the Fastify backend. Decimal
- * columns arrive as strings (precision-preserving transport); convert to
- * `number` only at display/aggregation time.
+ * Domain types for data coming from the Fastify backend.
+ *
+ * The API shapes themselves live in `@repo/api-contract` and are re-exported
+ * here so existing `@/lib/types` imports keep working. They are the *wire*
+ * shapes: `Decimal` columns arrive as strings (precision-preserving transport)
+ * and timestamps as ISO strings — convert to `number`/`Date` only at
+ * display/aggregation time.
+ *
+ * Only types with no server-side counterpart are declared below.
  */
 
-export interface Portfolio {
-  id: string;
-  name: string;
-  isDefault: boolean;
-  currency: string;
-}
+import type { Holding } from "@repo/api-contract";
 
-export interface RawHolding {
-  id: string;
-  quantity: string;
-  avgCostBasis: string;
-  asset: { ticker: string; name: string; currency: string; assetType: string };
-}
+export type {
+  AssetSearchResult,
+  Currency,
+  Holding,
+  Portfolio,
+  PriceResult,
+  Transaction,
+  TransactionPage,
+  TransactionType,
+  User,
+} from "@repo/api-contract";
 
-export interface Transaction {
-  id: string;
-  type: string;
-  quantity: string;
-  price: string;
-  currency: string;
-  fee: string;
-  notes: string | null;
-  transactedAt: string;
-  asset: { ticker: string; name: string };
-}
-
-/** One item of the /api/prices batch response; failed lookups carry `error`. */
-export interface PriceResult {
-  ticker: string;
-  price?: string;
-  currency?: string;
-  recordedAt?: string;
-  cached?: boolean;
-  /** ARS-per-USD rate applied server-side; present only for ?currency=ARS. */
-  mepRate?: string;
-  error?: string;
-}
+/**
+ * The holding shape as it arrives from the API, named to stay distinct from the
+ * enriched, display-ready `EnrichedHolding` below.
+ */
+export type RawHolding = Holding;
 
 /** A merged position with display-ready numbers, in the requested currency. */
 export interface EnrichedHolding {

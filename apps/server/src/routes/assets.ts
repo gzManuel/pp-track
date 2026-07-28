@@ -1,29 +1,11 @@
 import type { FastifyPluginAsync } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
+import { assetSearchQuerySchema, assetSearchResultSchema, type AssetSearchResult } from "@repo/api-contract";
 import { searchSymbols } from "../services/yahoo-finance.js";
-
-// Cap the free-text query — it is forwarded verbatim to Yahoo's search API.
-const searchQuery = z.object({ q: z.string().min(1).max(100) });
 
 // Cap merged Yahoo results so the autocomplete payload stays small.
 const MAX_YAHOO_RESULTS = 10;
-
-const searchResult = z.object({
-  symbol: z.string(),
-  name: z.string(),
-  exchange: z.string().nullable(),
-  type: z.string(),
-  source: z.enum(["portfolio", "yahoo"]),
-});
-
-interface AssetSearchResult {
-  symbol: string;
-  name: string;
-  exchange: string | null;
-  type: string;
-  source: "portfolio" | "yahoo";
-}
 
 const assetsRoutes: FastifyPluginAsync = async (fastify) => {
   const app = fastify.withTypeProvider<ZodTypeProvider>();
@@ -31,7 +13,7 @@ const assetsRoutes: FastifyPluginAsync = async (fastify) => {
   // Ticker autocomplete: the user's own assets first, then Yahoo search results.
   app.get(
     "/assets/search",
-    { onRequest: app.authenticate, schema: { querystring: searchQuery, response: { 200: z.array(searchResult) } } },
+    { onRequest: app.authenticate, schema: { querystring: assetSearchQuerySchema, response: { 200: z.array(assetSearchResultSchema) } } },
     async (request) => {
       const { q } = request.query;
 

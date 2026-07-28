@@ -2,32 +2,34 @@ import type { FastifyPluginAsync } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
+import {
+  createPortfolioRequestSchema,
+  errorResponseSchema,
+  holdingSchema,
+  portfolioSchema,
+  transactionListQuerySchema,
+  transactionPageSchema,
+  transactionSchema,
+  transactionTypeSchema,
+} from "@repo/api-contract";
 import { resolveTransactionAsset } from "../services/assets.js";
 import { requirePortfolio, requireTransaction } from "../services/authorization.js";
 import { recomputeHolding } from "../services/holdings.js";
 
-// #1 — Schemas drive both runtime validation and the inferred TS types.
+// Route-local request schemas. Response shapes and the closed value sets live in
+// @repo/api-contract, so the web app's types are derived from the same source.
 const portfolioParams = z.object({ id: z.uuid() });
 const transactionParams = z.object({ id: z.uuid(), txId: z.uuid() });
 
-const createPortfolioBody = z.object({
-  name: z.string().min(1),
-});
-
-// Cursor pagination for the transactions list — the only unbounded-cardinality
-// collection in the API.
-const transactionsListQuery = z.object({
-  take: z.coerce.number().int().min(1).max(200).default(100),
-  cursor: z.uuid().optional(),
-});
-
 // Exported for schema-level tests (date anchoring, type normalization).
 export const createTransactionBody = z.object({
-  ticker: z.string().min(1),
-  // Accept any casing from the client, validate against the known set.
-  type: z.preprocess((v) => (typeof v === "string" ? v.toUpperCase() : v), z.enum(["BUY", "SELL", "DIVIDEND", "FEE"])),
+  ticker: z.string().min(1).max(20),
+  // Accept any casing from the client, validate against the contract's set.
+  type: z.preprocess((v) => (typeof v === "string" ? v.toUpperCase() : v), transactionTypeSchema),
   quantity: z.number().positive(),
   price: z.number().nonnegative(),
+  // Wider than the contract's currency enum on purpose: the server also accepts
+  // whatever currency an imported/legacy row carries, and normalizes to USD.
   currency: z.string().min(1),
   // A bare YYYY-MM-DD (from <input type="date">) is anchored at noon UTC so the
   // calendar day can't shift under any timezone (UTC-11..+12); anything else
@@ -39,7 +41,7 @@ export const createTransactionBody = z.object({
     z.coerce.date(),
   ),
   fee: z.number().nonnegative().optional(),
-  notes: z.string().optional(),
+  notes: z.string().max(500).optional(),
 });
 
 // Edits accept the same fields plus an optional target portfolio — supplying a
@@ -48,61 +50,13 @@ const updateTransactionBody = createTransactionBody.extend({
   portfolioId: z.uuid().optional(),
 });
 
-// Response schemas keep handlers from leaking whole DB rows by default (a future
-// sensitive column stays server-side unless explicitly added here). Decimal
-// columns serialize as strings to preserve precision; Dates stringify to ISO.
-const decimalString = z.instanceof(Prisma.Decimal).transform((d) => d.toString());
-
-const errorResponse = z.object({ error: z.string() });
-
-const portfolioResponse = z.object({
-  id: z.uuid(),
-  userId: z.uuid(),
-  name: z.string(),
-  description: z.string().nullable(),
-  currency: z.string(),
-  isDefault: z.boolean(),
-  createdAt: z.date(),
-});
-
-const holdingResponse = z.object({
-  id: z.uuid(),
-  portfolioId: z.uuid(),
-  assetId: z.uuid(),
-  quantity: decimalString,
-  avgCostBasis: decimalString,
-  createdAt: z.date(),
-  updatedAt: z.date(),
-  asset: z.object({
-    ticker: z.string(),
-    name: z.string(),
-    currency: z.string(),
-    assetType: z.string(),
-  }),
-});
-
-const transactionResponse = z.object({
-  id: z.uuid(),
-  portfolioId: z.uuid(),
-  assetId: z.uuid(),
-  type: z.string(),
-  quantity: decimalString,
-  price: decimalString,
-  fee: decimalString,
-  currency: z.string(),
-  transactedAt: z.date(),
-  notes: z.string().nullable(),
-  createdAt: z.date(),
-  asset: z.object({ ticker: z.string(), name: z.string() }),
-});
-
 const portfoliosRoutes: FastifyPluginAsync = async (fastify) => {
   // Opt this plugin's routes into Zod-typed request/reply inference.
   const app = fastify.withTypeProvider<ZodTypeProvider>();
 
   // #2 — `app.authenticate` runs first and sets `request.userId`.
   // #3 — `app.prisma` is the decorated shared client (no direct import).
-  app.get("/portfolios", { onRequest: app.authenticate, schema: { response: { 200: z.array(portfolioResponse) } } }, async (request) =>
+  app.get("/portfolios", { onRequest: app.authenticate, schema: { response: { 200: z.array(portfolioSchema) } } }, async (request) =>
     app.prisma.portfolio.findMany({
       where: { userId: request.userId },
       orderBy: [{ isDefault: "desc" }, { createdAt: "asc" }],
@@ -113,7 +67,7 @@ const portfoliosRoutes: FastifyPluginAsync = async (fastify) => {
     "/portfolios",
     {
       onRequest: app.authenticate,
-      schema: { body: createPortfolioBody, response: { 201: portfolioResponse } },
+      schema: { body: createPortfolioRequestSchema, response: { 201: portfolioSchema } },
     },
     async (request, reply) => {
       const { name } = request.body; // typed as string, already validated
@@ -149,7 +103,10 @@ const portfoliosRoutes: FastifyPluginAsync = async (fastify) => {
 
   app.get(
     "/portfolios/:id/holdings",
-    { onRequest: app.authenticate, schema: { params: portfolioParams, response: { 200: z.array(holdingResponse), 404: errorResponse } } },
+    {
+      onRequest: app.authenticate,
+      schema: { params: portfolioParams, response: { 200: z.array(holdingSchema), 404: errorResponseSchema } },
+    },
     async (request) => {
       await requirePortfolio(app.prisma, request.params.id, request.userId);
 
@@ -176,10 +133,10 @@ const portfoliosRoutes: FastifyPluginAsync = async (fastify) => {
       onRequest: app.authenticate,
       schema: {
         params: portfolioParams,
-        querystring: transactionsListQuery,
+        querystring: transactionListQuerySchema,
         response: {
-          200: z.object({ items: z.array(transactionResponse), nextCursor: z.uuid().nullable() }),
-          404: errorResponse,
+          200: transactionPageSchema,
+          404: errorResponseSchema,
         },
       },
     },
@@ -207,7 +164,7 @@ const portfoliosRoutes: FastifyPluginAsync = async (fastify) => {
     "/portfolios/:id/transactions",
     {
       onRequest: app.authenticate,
-      schema: { params: portfolioParams, body: createTransactionBody, response: { 201: transactionResponse, 404: errorResponse } },
+      schema: { params: portfolioParams, body: createTransactionBody, response: { 201: transactionSchema, 404: errorResponseSchema } },
     },
     async (request, reply) => {
       await requirePortfolio(app.prisma, request.params.id, request.userId);
@@ -266,7 +223,7 @@ const portfoliosRoutes: FastifyPluginAsync = async (fastify) => {
     "/portfolios/:id/transactions/:txId",
     {
       onRequest: app.authenticate,
-      schema: { params: transactionParams, body: updateTransactionBody, response: { 200: transactionResponse, 404: errorResponse } },
+      schema: { params: transactionParams, body: updateTransactionBody, response: { 200: transactionSchema, 404: errorResponseSchema } },
     },
     async (request) => {
       await requirePortfolio(app.prisma, request.params.id, request.userId);
@@ -328,7 +285,7 @@ const portfoliosRoutes: FastifyPluginAsync = async (fastify) => {
 
   app.delete(
     "/portfolios/:id/transactions/:txId",
-    { onRequest: app.authenticate, schema: { params: transactionParams, response: { 204: z.null(), 404: errorResponse } } },
+    { onRequest: app.authenticate, schema: { params: transactionParams, response: { 204: z.null(), 404: errorResponseSchema } } },
     async (request, reply) => {
       await requirePortfolio(app.prisma, request.params.id, request.userId);
       const transaction = await requireTransaction(app.prisma, request.params.txId, request.params.id);

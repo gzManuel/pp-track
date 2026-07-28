@@ -5,8 +5,12 @@ import type { RawHolding } from "./types";
 function raw(ticker: string, quantity: string, avgCostBasis: string, currency = "USD"): RawHolding {
   return {
     id: `h-${ticker}-${quantity}`,
+    portfolioId: "00000000-0000-4000-8000-000000000001",
+    assetId: `asset-${ticker}`,
     quantity,
     avgCostBasis,
+    createdAt: "2026-01-01T00:00:00.000Z",
+    updatedAt: "2026-01-01T00:00:00.000Z",
     asset: { ticker, name: ticker, currency, assetType: "EQUITY" },
   };
 }

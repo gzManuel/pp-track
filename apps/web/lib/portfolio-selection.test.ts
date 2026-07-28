@@ -2,9 +2,22 @@ import { describe, expect, it } from "vitest";
 import { parsePortfolioSelection } from "./portfolio-selection";
 import type { Portfolio } from "./types";
 
-const A: Portfolio = { id: "a", name: "Alpha", isDefault: false, currency: "USD" };
-const B: Portfolio = { id: "b", name: "Beta", isDefault: true, currency: "USD" };
-const C: Portfolio = { id: "c", name: "Gamma", isDefault: false, currency: "USD" };
+// Only id/isDefault matter here; the rest satisfies the API shape.
+function portfolio(id: string, name: string, isDefault: boolean): Portfolio {
+  return {
+    id,
+    userId: "00000000-0000-4000-8000-000000000001",
+    name,
+    description: null,
+    currency: "USD",
+    isDefault,
+    createdAt: "2026-01-01T00:00:00.000Z",
+  };
+}
+
+const A = portfolio("a", "Alpha", false);
+const B = portfolio("b", "Beta", true);
+const C = portfolio("c", "Gamma", false);
 const ALL = [A, B, C];
 
 describe("parsePortfolioSelection", () => {
