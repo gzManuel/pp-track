@@ -28,7 +28,7 @@ export default async function PortfoliosPage({ searchParams }: { searchParams: P
 
   return (
     <>
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-6 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <h1 className="text-2xl font-semibold">Portfolios</h1>
         <CreatePortfolioDialog />
       </div>
@@ -43,7 +43,7 @@ export default async function PortfoliosPage({ searchParams }: { searchParams: P
               <Link
                 key={p.id}
                 href={`/dashboard?portfolio=${p.id}`}
-                className="rounded-lg border p-5 flex flex-col gap-3 transition-colors hover:bg-muted/50 hover:border-foreground/20"
+                className="rounded-lg border p-5 flex flex-col gap-3 transition-colors hover:bg-muted/50 hover:border-foreground/20 active:bg-muted/50 active:border-foreground/20"
               >
                 <div className="flex flex-col gap-1">
                   <div className="flex items-center justify-between">

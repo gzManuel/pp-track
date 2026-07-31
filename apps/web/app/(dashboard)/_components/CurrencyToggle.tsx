@@ -27,7 +27,7 @@ export default function CurrencyToggle() {
           key={opt}
           variant={active === opt ? "default" : "ghost"}
           size="sm"
-          className="h-7 px-3"
+          className="h-9 px-3 md:h-7"
           aria-pressed={active === opt}
           onClick={() => {
             select(opt);

@@ -33,7 +33,7 @@ export default function CreatePortfolioDialog() {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button>Create your first portfolio</Button>
+        <Button className="h-10 self-start md:h-8">Create your first portfolio</Button>
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
@@ -49,11 +49,9 @@ export default function CreatePortfolioDialog() {
               onChange={(e) => {
                 setName(e.target.value);
               }}
-              // eslint-disable-next-line jsx-a11y/no-autofocus -- dialog input should focus on open
-              autoFocus
             />
           </div>
-          <Button type="submit" disabled={isPending || !name.trim()}>
+          <Button type="submit" disabled={isPending || !name.trim()} className="h-10 md:h-8">
             {isPending ? "Creating..." : "Create portfolio"}
           </Button>
         </form>

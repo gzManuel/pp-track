@@ -16,7 +16,18 @@ import {
 } from "@/components/shadcn/Dialog";
 import { deleteTransaction } from "../../actions";
 
-export default function DeleteTransactionButton({ portfolioId, txId, label }: { portfolioId: string; txId: string; label: string }) {
+export default function DeleteTransactionButton({
+  portfolioId,
+  txId,
+  label,
+  /** Labelled full-width trigger for the mobile card list; icon-only in the table. */
+  wideTrigger = false,
+}: {
+  portfolioId: string;
+  txId: string;
+  label: string;
+  wideTrigger?: boolean;
+}) {
   const [open, setOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
 
@@ -35,14 +46,21 @@ export default function DeleteTransactionButton({ portfolioId, txId, label }: { 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-8 w-8 text-muted-foreground hover:text-destructive"
-          aria-label="Delete transaction"
-        >
-          <Trash2 className="h-4 w-4" />
-        </Button>
+        {wideTrigger ? (
+          <Button variant="destructive" className="h-10 flex-1">
+            <Trash2 className="h-4 w-4" />
+            Delete
+          </Button>
+        ) : (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 text-muted-foreground hover:text-destructive"
+            aria-label="Delete transaction"
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        )}
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>

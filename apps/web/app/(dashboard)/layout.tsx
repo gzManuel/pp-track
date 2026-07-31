@@ -2,6 +2,7 @@ import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import { authOptions } from "@/lib/auth";
 import DashboardNav from "./_components/DashboardNav";
+import MobileNav from "./_components/MobileNav";
 import SignOutButton from "./_components/SignOutButton";
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -10,15 +11,20 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   return (
     <div className="min-h-screen flex flex-col">
-      <header className="border-b px-8 py-4 flex items-center justify-between">
-        <span className="font-bold text-lg">pp-track</span>
+      <header className="border-b px-4 py-3 md:px-8 md:py-4 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-1">
+          <MobileNav />
+          <span className="font-bold text-lg">pp-track</span>
+        </div>
         <SignOutButton />
       </header>
       <div className="flex flex-1">
-        <aside className="w-40 border-r px-4 py-4">
+        <aside className="hidden w-40 border-r px-4 py-4 md:block">
           <DashboardNav />
         </aside>
-        <div className="flex-1 p-8">{children}</div>
+        {/* min-w-0 lets this flex child shrink below its content's intrinsic
+            width — without it a wide table forces the page to scroll sideways. */}
+        <div className="min-w-0 flex-1 p-4 md:p-8">{children}</div>
       </div>
     </div>
   );

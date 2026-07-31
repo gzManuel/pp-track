@@ -71,12 +71,12 @@ export default function PortfolioSwitcher({
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button variant="outline" size="lg" role="combobox" aria-expanded={open} className="w-44 justify-between font-normal">
+        <Button variant="outline" size="lg" role="combobox" aria-expanded={open} className="w-full justify-between font-normal md:w-44">
           <span className="truncate">{triggerLabel()}</span>
           <ChevronsUpDown className="ml-2 size-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-56 p-0">
+      <PopoverContent className="w-[calc(100vw-2rem)] max-w-72 p-0 md:w-56">
         <Command>
           <CommandInput placeholder="Search portfolios..." />
           <CommandList>

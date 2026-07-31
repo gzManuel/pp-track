@@ -128,7 +128,7 @@ export default function LogTransactionForm({
           )}
         />
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <FormField
             control={form.control}
             name="ticker"
@@ -165,7 +165,7 @@ export default function LogTransactionForm({
           />
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <FormField
             control={form.control}
             name="quantity"
@@ -194,7 +194,7 @@ export default function LogTransactionForm({
           />
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <FormField
             control={form.control}
             name="currency"
@@ -268,7 +268,7 @@ export default function LogTransactionForm({
           </p>
         )}
 
-        <Button type="submit" disabled={isPending} className="self-start">
+        <Button type="submit" disabled={isPending} className="h-10 w-full sm:h-8 sm:w-auto sm:self-start">
           {isPending ? "Saving..." : submitLabel}
         </Button>
       </form>

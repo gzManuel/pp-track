@@ -67,7 +67,7 @@ export default function AllocationChart({ holdings, priceCurrency }: { holdings:
         {data.length === 0 ? (
           <p className="py-12 text-center text-sm text-muted-foreground">No data to chart yet.</p>
         ) : (
-          <ChartContainer config={chartConfig} className="mx-auto aspect-square max-h-[350px]">
+          <ChartContainer config={chartConfig} className="mx-auto aspect-square max-h-[280px] sm:max-h-[350px]">
             <PieChart>
               <ChartTooltip
                 content={
@@ -82,7 +82,17 @@ export default function AllocationChart({ holdings, priceCurrency }: { holdings:
                   />
                 }
               />
-              <Pie data={data} dataKey="value" nameKey="ticker" innerRadius={75} strokeWidth={2} labelLine={false} label={renderSliceLabel}>
+              {/* Percentage rather than pixels, so the donut band keeps its
+                  proportions when the card narrows on a phone. */}
+              <Pie
+                data={data}
+                dataKey="value"
+                nameKey="ticker"
+                innerRadius="55%"
+                strokeWidth={2}
+                labelLine={false}
+                label={renderSliceLabel}
+              >
                 {data.map((d) => (
                   <Cell key={d.ticker} fill={d.fill} />
                 ))}

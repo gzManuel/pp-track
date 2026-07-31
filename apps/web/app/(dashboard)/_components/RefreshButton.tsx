@@ -17,7 +17,14 @@ export default function RefreshButton() {
   }
 
   return (
-    <Button variant="outline" size="icon" onClick={handleRefresh} aria-label="Refresh prices" disabled={isPending}>
+    <Button
+      variant="outline"
+      size="icon"
+      className="size-10 md:size-8"
+      onClick={handleRefresh}
+      aria-label="Refresh prices"
+      disabled={isPending}
+    >
       <RefreshCw className={`h-4 w-4 ${isPending ? "animate-spin" : ""}`} />
     </Button>
   );

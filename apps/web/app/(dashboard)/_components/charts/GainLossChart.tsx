@@ -58,10 +58,12 @@ export default function GainLossChart({ holdings, priceCurrency }: { holdings: E
         {data.length === 0 ? (
           <p className="py-12 text-center text-sm text-muted-foreground">No data to chart yet.</p>
         ) : (
-          <ChartContainer config={chartConfig} className="aspect-auto h-[280px] w-full">
+          <ChartContainer config={chartConfig} className="aspect-auto h-[240px] w-full sm:h-[280px]">
             <BarChart data={data} margin={{ top: 8 }}>
               <CartesianGrid vertical={false} />
-              <XAxis dataKey="ticker" tickLine={false} axisLine={false} tickMargin={8} />
+              {/* Drop intermediate ticker labels rather than letting them
+                  overlap once the plot area narrows. */}
+              <XAxis dataKey="ticker" tickLine={false} axisLine={false} tickMargin={8} interval="preserveStartEnd" minTickGap={4} />
               <YAxis tickLine={false} axisLine={false} width={56} />
               <ChartTooltip
                 content={

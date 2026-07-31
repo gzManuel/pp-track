@@ -18,12 +18,12 @@ export default function LogTransactionDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button>
+        <Button className="h-10 md:h-8">
           <Plus className="h-4 w-4" />
           Log transaction
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+      <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>Log transaction</DialogTitle>
           <DialogDescription>Record a buy or sell to update your holdings.</DialogDescription>

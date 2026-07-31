@@ -17,8 +17,10 @@ export default function DashboardNav() {
         <Link
           key={href}
           href={href}
-          className={`px-3 py-2 text-sm font-medium rounded-md transition-colors ${
-            pathname === href ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+          className={`flex min-h-11 items-center px-3 py-2 text-sm font-medium rounded-md transition-colors md:min-h-0 ${
+            pathname === href
+              ? "bg-muted text-foreground"
+              : "text-muted-foreground hover:text-foreground hover:bg-muted/50 active:bg-muted/50 active:text-foreground"
           }`}
         >
           {label}
