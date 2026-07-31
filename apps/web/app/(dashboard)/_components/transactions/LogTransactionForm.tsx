@@ -30,6 +30,24 @@ export interface EditableTransaction {
 
 type FormValues = TransactionFormValues;
 
+// Blank form state for logging a new transaction. The numeric fields default to
+// "" rather than undefined: an Input rendered with value={undefined} is
+// uncontrolled, so a reset would leave the typed text sitting in the DOM.
+// Rebuilt on every call so a form left open overnight resets to today's date.
+function blankValues(portfolioId: string): FormValues {
+  return {
+    portfolioId,
+    ticker: "",
+    type: "BUY",
+    quantity: "",
+    price: "",
+    currency: DEFAULT_CURRENCY,
+    transactedAt: new Date().toLocaleDateString("en-CA"),
+    fee: "",
+    notes: "",
+  };
+}
+
 export default function LogTransactionForm({
   portfolios,
   defaultPortfolioId,
@@ -64,17 +82,7 @@ export default function LogTransactionForm({
           fee: Number(transaction.fee) > 0 ? String(Number(transaction.fee)) : "",
           notes: transaction.notes ?? "",
         }
-      : {
-          portfolioId: defaultPortfolioId,
-          ticker: "",
-          type: "BUY",
-          quantity: undefined,
-          price: undefined,
-          currency: DEFAULT_CURRENCY,
-          transactedAt: new Date().toLocaleDateString("en-CA"),
-          fee: undefined,
-          notes: "",
-        },
+      : blankValues(defaultPortfolioId),
   });
 
   function onSubmit(values: FormValues) {
@@ -95,7 +103,9 @@ export default function LogTransactionForm({
       }
 
       toast.success(transaction ? "Transaction updated" : "Transaction logged");
-      if (!transaction) form.reset();
+      // Reset with an explicit object: keeps the portfolio just used selected
+      // for back-to-back entries and clears everything else.
+      if (!transaction) form.reset(blankValues(portfolioId));
       onSuccess?.();
     });
   }
@@ -109,7 +119,9 @@ export default function LogTransactionForm({
           render={({ field }) => (
             <FormItem>
               <FormLabel>Portfolio</FormLabel>
-              <Select onValueChange={field.onChange} defaultValue={field.value}>
+              {/* value, not defaultValue: an uncontrolled trigger keeps showing
+                  the old choice after form.reset() while state has moved on. */}
+              <Select onValueChange={field.onChange} value={field.value}>
                 <FormControl>
                   <SelectTrigger>
                     <SelectValue />
@@ -148,7 +160,7 @@ export default function LogTransactionForm({
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Type</FormLabel>
-                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                <Select onValueChange={field.onChange} value={field.value}>
                   <FormControl>
                     <SelectTrigger>
                       <SelectValue />
@@ -201,7 +213,7 @@ export default function LogTransactionForm({
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Currency</FormLabel>
-                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                <Select onValueChange={field.onChange} value={field.value}>
                   <FormControl>
                     <SelectTrigger>
                       <SelectValue />
