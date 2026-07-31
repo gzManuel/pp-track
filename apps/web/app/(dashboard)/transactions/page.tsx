@@ -1,10 +1,10 @@
 import { getUserId } from "@/lib/auth";
 import { serverFetchJson } from "@/lib/server-api";
 import { parsePortfolioSelection } from "@/lib/portfolio-selection";
-import type { Portfolio, Transaction } from "@/lib/types";
-import LogTransactionForm from "../_components/LogTransactionForm";
-import PortfolioSwitcher from "../_components/PortfolioSwitcher";
-import TransactionsTable from "../_components/TransactionsTable";
+import type { Portfolio, TransactionPage } from "@/lib/types";
+import LogTransactionForm from "../_components/transactions/LogTransactionForm";
+import PortfolioSwitcher from "../_components/portfolio/PortfolioSwitcher";
+import TransactionsTable from "../_components/transactions/TransactionsTable";
 
 export default async function TransactionsPage({ searchParams }: { searchParams: Promise<{ portfolio?: string }> }) {
   const userId = await getUserId();
@@ -43,7 +43,7 @@ export default async function TransactionsPage({ searchParams }: { searchParams:
   // "load more" flow can consume nextCursor later if history outgrows this).
   const txLists = await Promise.all(
     selectedPortfolios.map((p) =>
-      serverFetchJson<{ items: Transaction[]; nextCursor: string | null }>(`/api/portfolios/${p.id}/transactions?take=200`, {
+      serverFetchJson<TransactionPage>(`/api/portfolios/${p.id}/transactions?take=200`, {
         userId,
       }).then(({ items }) => items.map((tx) => ({ ...tx, portfolioId: p.id, portfolioName: p.name }))),
     ),

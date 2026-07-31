@@ -1,7 +1,7 @@
 import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import { authOptions } from "@/lib/auth";
-import SignInButton from "./SignInButton";
+import SignInButton from "./_components/SignInButton";
 
 export default async function Home() {
   const session = await getServerSession(authOptions);

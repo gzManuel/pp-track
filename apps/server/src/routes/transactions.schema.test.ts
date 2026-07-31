@@ -1,10 +1,5 @@
 import { describe, expect, it } from "vitest";
-
-// portfolios.ts transitively imports env.ts — provide required vars first.
-process.env.INTERNAL_API_SECRET ??= "test-secret-value";
-process.env.DATABASE_URL ??= "postgresql://test:test@localhost:5432/test";
-
-const { createTransactionBody } = await import("./portfolios.js");
+import { createTransactionBody } from "./transactions.js";
 
 const base = {
   ticker: "AAPL",

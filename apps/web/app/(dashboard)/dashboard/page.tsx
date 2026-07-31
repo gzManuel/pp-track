@@ -3,13 +3,13 @@ import { serverFetchJson } from "@/lib/server-api";
 import { enrichPositions, fetchHoldings, fetchPriceData, mergeByTicker } from "@/lib/holdings";
 import { parsePortfolioSelection } from "@/lib/portfolio-selection";
 import type { Portfolio } from "@/lib/types";
-import AllocationChart from "../_components/AllocationChart";
-import CreatePortfolioDialog from "../_components/CreatePortfolioDialog";
+import AllocationChart from "../_components/charts/AllocationChart";
+import CreatePortfolioDialog from "../_components/portfolio/CreatePortfolioDialog";
 import CurrencyToggle from "../_components/CurrencyToggle";
-import GainLossChart from "../_components/GainLossChart";
-import HoldingsTable from "../_components/HoldingsTable";
-import LogTransactionDialog from "../_components/LogTransactionDialog";
-import PortfolioSwitcher from "../_components/PortfolioSwitcher";
+import GainLossChart from "../_components/charts/GainLossChart";
+import HoldingsTable from "../_components/portfolio/HoldingsTable";
+import LogTransactionDialog from "../_components/transactions/LogTransactionDialog";
+import PortfolioSwitcher from "../_components/portfolio/PortfolioSwitcher";
 import RefreshButton from "../_components/RefreshButton";
 
 export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ currency?: string; portfolio?: string }> }) {

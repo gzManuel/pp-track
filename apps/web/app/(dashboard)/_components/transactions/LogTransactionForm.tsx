@@ -9,7 +9,7 @@ import { Button } from "@/components/shadcn/Button";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/shadcn/Form";
 import { Input } from "@/components/shadcn/Input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/shadcn/Select";
-import { logTransaction, updateTransaction } from "../actions";
+import { logTransaction, updateTransaction } from "../../actions";
 import TickerCombobox from "./TickerCombobox";
 
 // When present, the form edits this transaction instead of logging a new one.

@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
 import FacebookProvider from "next-auth/providers/facebook";
 import { redirect } from "next/navigation";
+import type { User } from "@repo/api-contract";
 import { requireEnv, serverFetch } from "./server-api";
 
 // `next build` imports this module without runtime secrets — skip the fail-fast
@@ -75,7 +76,7 @@ export const authOptions: NextAuthOptions = {
           }),
         });
         if (!res.ok) throw new Error(`Failed to upsert user: ${String(res.status)}`);
-        const dbUser = (await res.json()) as { id: string };
+        const dbUser = (await res.json()) as User;
         token.userId = dbUser.id;
       }
       return token;

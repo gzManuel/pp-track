@@ -4,7 +4,7 @@ import { serverFetchJson } from "@/lib/server-api";
 import { fetchHoldings, fetchPriceData, summarizeHoldings } from "@/lib/holdings";
 import { formatMoney } from "@/lib/utils";
 import type { Portfolio } from "@/lib/types";
-import CreatePortfolioDialog from "../_components/CreatePortfolioDialog";
+import CreatePortfolioDialog from "../_components/portfolio/CreatePortfolioDialog";
 
 export default async function PortfoliosPage() {
   const userId = await getUserId();
