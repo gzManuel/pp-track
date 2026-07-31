@@ -20,9 +20,21 @@ export const loggableTransactionTypeSchema = z.enum(LOGGABLE_TRANSACTION_TYPES);
 
 export type LoggableTransactionType = z.infer<typeof loggableTransactionTypeSchema>;
 
-/** Currencies a transaction may be entered in. Storage is normalized to USD. */
-export const SUPPORTED_CURRENCIES = ["USD", "ARS"] as const;
+/**
+ * The three ways a trade can be denominated — and, identically, the three views
+ * the dashboard offers. Both sets are the same because you can transact in any
+ * of them, so there is deliberately no separate "display currency" enum.
+ *
+ * `MEP` and `CCL` are both US dollars; they differ in *which* dollar (local
+ * settlement vs. cable). A plain `USD` value is not offered on purpose: it never
+ * said where the dollars were, and the old code silently treated it as MEP.
+ *
+ * Nothing is converted on write. A transaction stores the amount exactly as
+ * entered in one of these currencies, plus the MEP and CCL rates in effect on
+ * its date, and the other two views are derived from that.
+ */
+export const CURRENCIES = ["ARS", "MEP", "CCL"] as const;
 
-export const currencySchema = z.enum(SUPPORTED_CURRENCIES);
+export const currencySchema = z.enum(CURRENCIES);
 
 export type Currency = z.infer<typeof currencySchema>;

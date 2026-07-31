@@ -24,7 +24,7 @@ export const portfolioRow = {
   userId: USER_ID,
   name: "Main",
   description: null,
-  currency: "USD",
+  currency: "MEP",
   isDefault: true,
   createdAt: new Date("2026-01-01T00:00:00.000Z"),
 };
@@ -49,7 +49,9 @@ export function transactionRow(overrides: Record<string, unknown> = {}) {
     quantity: dec("10"),
     price: dec("100"),
     fee: dec("0"),
-    currency: "USD",
+    currency: "MEP",
+    mepRate: dec("1500"),
+    cclRate: dec("1600"),
     transactedAt: new Date("2026-01-15T12:00:00.000Z"),
     notes: null,
     createdAt: new Date("2026-01-15T12:00:00.000Z"),
@@ -63,7 +65,7 @@ export const validTransactionBody = {
   type: "BUY",
   quantity: 10,
   price: 100,
-  currency: "USD",
+  currency: "MEP",
   transactedAt: "2026-01-15",
 };
 
@@ -76,6 +78,8 @@ export interface ErrorBody {
 export interface HoldingBody {
   quantity: string;
   avgCostBasis: string;
+  avgCostBasisArs: string;
+  avgCostBasisCcl: string;
 }
 
 export interface TransactionPageBody {

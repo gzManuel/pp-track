@@ -7,7 +7,7 @@ const formValues: TransactionFormValues = {
   type: "BUY",
   quantity: "10",
   price: "150.50",
-  currency: "USD",
+  currency: "MEP",
   transactedAt: "2026-07-22",
   fee: "",
   notes: "",

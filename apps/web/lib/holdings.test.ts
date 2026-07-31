@@ -1,22 +1,31 @@
 import { describe, expect, it } from "vitest";
+import type { Currency } from "@repo/api-contract";
 import { enrichPositions, mergeByTicker, summarizeHoldings, type Position, type PriceData } from "./holdings";
 import type { RawHolding } from "./types";
 
+/**
+ * A holding whose MEP basis is `avgCostBasis`, with the ARS and CCL bases at
+ * 1000x and 1.25x of it — distinct multiples so a test picking the wrong column
+ * fails loudly rather than coincidentally matching.
+ */
 function raw(ticker: string, quantity: string, avgCostBasis: string, currency = "USD"): RawHolding {
+  const mep = Number(avgCostBasis);
   return {
     id: `h-${ticker}-${quantity}`,
     portfolioId: "00000000-0000-4000-8000-000000000001",
     assetId: `asset-${ticker}`,
     quantity,
     avgCostBasis,
+    avgCostBasisArs: String(mep * 1000),
+    avgCostBasisCcl: String(mep * 1.25),
     createdAt: "2026-01-01T00:00:00.000Z",
     updatedAt: "2026-01-01T00:00:00.000Z",
     asset: { ticker, name: ticker, currency, assetType: "EQUITY" },
   };
 }
 
-function priceData(prices: Record<string, number>, mepRate: number | null = null): PriceData {
-  return { prices: new Map(Object.entries(prices)), mepRate };
+function priceData(prices: Record<string, number>, currency: Currency = "MEP"): PriceData {
+  return { prices: new Map(Object.entries(prices)), currency };
 }
 
 describe("mergeByTicker", () => {
@@ -30,6 +39,13 @@ describe("mergeByTicker", () => {
   it("keeps distinct tickers separate", () => {
     const positions = mergeByTicker([raw("AAPL", "10", "100"), raw("MSFT", "5", "300")]);
     expect(positions.map((p) => p.ticker).sort()).toEqual(["AAPL", "MSFT"]);
+  });
+
+  it("takes the basis from the requested currency column", () => {
+    const holdings = [raw("AAPL", "10", "100")];
+    expect(mergeByTicker(holdings, "MEP")[0]?.costBasis).toBe(1000);
+    expect(mergeByTicker(holdings, "ARS")[0]?.costBasis).toBe(1_000_000);
+    expect(mergeByTicker(holdings, "CCL")[0]?.costBasis).toBe(1250);
   });
 });
 
@@ -61,19 +77,15 @@ describe("enrichPositions", () => {
     expect(h?.portfolioPct).toBeNull();
   });
 
-  it("converts USD cost basis with the MEP rate so ARS gain is single-currency", () => {
-    // price already in ARS (1500 * 1000), cost basis stored in USD (1000)
-    const [h] = enrichPositions([position], priceData({ AAPL: 150_000 }, 1000));
+  it("never re-converts the basis: both sides already share the view currency", () => {
+    // The ARS position carries the pesos actually paid, and the price came back
+    // in ARS. Applying an FX rate here (as the old code did) would double-count.
+    const arsPosition = { ...position, costBasis: 1_000_000 };
+    const [h] = enrichPositions([arsPosition], priceData({ AAPL: 150_000 }, "ARS"));
     expect(h?.costBasis).toBe(1_000_000);
     expect(h?.marketValue).toBe(1_500_000);
     expect(h?.gain).toBe(500_000);
     expect(h?.gainPct).toBe(50);
-  });
-
-  it("does not convert cost basis for assets not stored in USD", () => {
-    const arsPosition = { ...position, currency: "ARS" };
-    const [h] = enrichPositions([arsPosition], priceData({ AAPL: 150 }, 1000));
-    expect(h?.costBasis).toBe(1000); // untouched
   });
 
   it("guards gainPct when cost basis is zero", () => {
@@ -109,5 +121,11 @@ describe("summarizeHoldings", () => {
   it("returns null gainPct for an empty portfolio", () => {
     const summary = summarizeHoldings([], new Map());
     expect(summary.gainPct).toBeNull();
+  });
+
+  it("totals in the requested currency", () => {
+    const holdings = [raw("AAPL", "10", "100")];
+    expect(summarizeHoldings(holdings, new Map([["AAPL", 150]]), "MEP").totalInvested).toBe(1000);
+    expect(summarizeHoldings(holdings, new Map([["AAPL", 150_000]]), "ARS").totalInvested).toBe(1_000_000);
   });
 });

@@ -1,6 +1,7 @@
 import { getUserId } from "@/lib/auth";
 import { serverFetchJson } from "@/lib/server-api";
 import { enrichPositions, fetchHoldings, fetchPriceData, mergeByTicker } from "@/lib/holdings";
+import { parseDisplayCurrency } from "@/lib/currency";
 import { parsePortfolioSelection } from "@/lib/portfolio-selection";
 import type { Portfolio } from "@/lib/types";
 import AllocationChart from "../_components/charts/AllocationChart";
@@ -16,7 +17,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   const userId = await getUserId();
 
   const { currency, portfolio } = await searchParams;
-  const ars = currency?.toUpperCase() === "ARS";
+  const view = parseDisplayCurrency(currency);
 
   const portfolios = await serverFetchJson<Portfolio[]>("/api/portfolios", { userId });
 
@@ -49,11 +50,11 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   // The selected portfolios are aggregated; the same asset across portfolios is
   // merged into one row.
   const holdingsLists = await Promise.all(selectedPortfolios.map((p) => fetchHoldings(userId, p.id)));
-  const positions = mergeByTicker(holdingsLists.flat());
+  const positions = mergeByTicker(holdingsLists.flat(), view);
 
   const priceData = await fetchPriceData(
     positions.map((p) => p.ticker),
-    ars,
+    view,
   );
   const enrichedHoldings = enrichPositions(positions, priceData);
 
@@ -68,12 +69,12 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         </div>
       </div>
       <section className="mb-10 grid gap-4 md:grid-cols-2">
-        <AllocationChart holdings={enrichedHoldings} priceCurrency={ars ? "ARS" : "USD"} />
-        <GainLossChart holdings={enrichedHoldings} priceCurrency={ars ? "ARS" : "USD"} />
+        <AllocationChart holdings={enrichedHoldings} priceCurrency={view} />
+        <GainLossChart holdings={enrichedHoldings} priceCurrency={view} />
       </section>
       <section className="mb-10">
         <h2 className="mb-3 text-lg font-medium">Positions</h2>
-        <HoldingsTable holdings={enrichedHoldings} priceCurrency={ars ? "ARS" : "USD"} />
+        <HoldingsTable holdings={enrichedHoldings} priceCurrency={view} />
       </section>
     </>
   );

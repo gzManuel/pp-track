@@ -1,5 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { HttpError } from "../http-error.js";
+import { addMoney, mapMoney, scaleMoney, toMoney, ZERO_MONEY, type Money } from "./currency.js";
+import { currencySchema } from "@repo/api-contract";
 
 export const ZERO = new Prisma.Decimal(0);
 
@@ -10,35 +12,47 @@ export const QTY_EPSILON = new Prisma.Decimal("1e-8");
 
 export interface ReplayTransaction {
   id: string;
-  type: string;
+  type: "BUY" | "SELL";
   quantity: Prisma.Decimal;
-  price: Prisma.Decimal;
-  fee: Prisma.Decimal;
+  /** Per-share price, expressed in all three currencies. */
+  price: Money;
+  /** Absolute fee, expressed in all three currencies. */
+  fee: Money;
 }
 
 export interface PositionState {
   quantity: Prisma.Decimal;
-  value: Prisma.Decimal;
+  value: Money;
 }
 
 /**
  * Replays BUY/SELL transactions in (quantity, value) space, where `value` is the
- * total cost basis (avgCostBasis * quantity). A BUY adds price*qty + fee; a SELL
- * removes shares at the running average (value drops proportionally, so the
- * average is unchanged). Pure — no DB access.
+ * total cost basis (avgCostBasis * quantity) carried in all three currencies at
+ * once. A BUY adds price*qty + fee; a SELL removes shares at the running average
+ * (value drops proportionally, so the average is unchanged).
+ *
+ * The three currencies are independent accumulators over a shared quantity —
+ * each holds the real amount transacted in that currency, so the ARS basis is
+ * the pesos actually spent rather than the dollar basis marked at today's rate.
+ * Pure — no DB access.
  */
 export function replayPosition(transactions: ReplayTransaction[]): PositionState {
   let quantity = ZERO;
-  let value = ZERO;
+  let value = ZERO_MONEY;
   for (const t of transactions) {
     if (t.type === "BUY") {
       quantity = quantity.plus(t.quantity);
-      value = value.plus(t.quantity.times(t.price)).plus(t.fee);
+      value = addMoney(value, addMoney(scaleMoney(t.price, t.quantity), t.fee));
     } else {
-      const avg = quantity.gt(0) ? value.div(quantity) : ZERO;
-      const sold = Prisma.Decimal.min(t.quantity, quantity);
-      quantity = Prisma.Decimal.max(ZERO, quantity.minus(t.quantity));
-      value = Prisma.Decimal.max(ZERO, value.minus(sold.times(avg)));
+      // Compute against the pre-sale quantity: the running average and the
+      // number of shares actually sold both depend on it.
+      const priorQuantity = quantity;
+      const sold = Prisma.Decimal.min(t.quantity, priorQuantity);
+      quantity = Prisma.Decimal.max(ZERO, priorQuantity.minus(t.quantity));
+      value = mapMoney(value, (v) => {
+        const avg = priorQuantity.gt(0) ? v.div(priorQuantity) : ZERO;
+        return Prisma.Decimal.max(ZERO, v.minus(sold.times(avg)));
+      });
     }
   }
   return { quantity, value };
@@ -61,13 +75,30 @@ export function sellOverdrawsAt(orderedTransactions: ReplayTransaction[], candid
   return false;
 }
 
+/** A holding's stored cost basis across the three currencies. */
+export interface HoldingBases {
+  quantity: Prisma.Decimal;
+  avgCostBasis: Prisma.Decimal;
+  avgCostBasisArs: Prisma.Decimal;
+  avgCostBasisCcl: Prisma.Decimal;
+}
+
 export interface RebuildInput {
   /** Current stored holding, or null when none exists. */
-  holding: { quantity: Prisma.Decimal; avgCostBasis: Prisma.Decimal } | null;
+  holding: HoldingBases | null;
   /** Transactions counted toward the base residual (what the holding "explains"). */
   explained: ReplayTransaction[];
   /** Transactions replayed chronologically to produce the new state. */
   rebuilt: ReplayTransaction[];
+}
+
+function holdingValue(holding: HoldingBases | null): Money {
+  if (!holding) return ZERO_MONEY;
+  return {
+    mep: holding.quantity.times(holding.avgCostBasis),
+    ars: holding.quantity.times(holding.avgCostBasisArs),
+    ccl: holding.quantity.times(holding.avgCostBasisCcl),
+  };
 }
 
 /**
@@ -80,26 +111,35 @@ export interface RebuildInput {
  *
  * Returns the new holding values, or null when the position is empty (delete).
  */
-export function computeRebuild(input: RebuildInput): { quantity: Prisma.Decimal; avgCostBasis: Prisma.Decimal } | null {
+export function computeRebuild(input: RebuildInput): HoldingBases | null {
   const explained = replayPosition(input.explained);
   const rebuilt = replayPosition(input.rebuilt);
 
   // The portion of the current holding not explained by its transactions (an
   // imported base, or ~0 for a transaction-built holding). Drop sub-precision
-  // residue so it can't survive.
+  // residue so it can't survive. Quantity is currency-independent, so one
+  // epsilon check governs all three value columns.
   const holdingQty = input.holding?.quantity ?? ZERO;
-  const holdingValue = holdingQty.times(input.holding?.avgCostBasis ?? ZERO);
   let baseQty = holdingQty.minus(explained.quantity);
-  let baseValue = holdingValue.minus(explained.value);
+  let baseValue = addMoney(
+    holdingValue(input.holding),
+    mapMoney(explained.value, (v) => v.neg()),
+  );
   if (baseQty.abs().lt(QTY_EPSILON)) {
     baseQty = ZERO;
-    baseValue = ZERO;
+    baseValue = ZERO_MONEY;
   }
 
   const newQty = baseQty.plus(rebuilt.quantity);
   if (newQty.lt(QTY_EPSILON)) return null;
 
-  return { quantity: newQty, avgCostBasis: baseValue.plus(rebuilt.value).div(newQty) };
+  const total = addMoney(baseValue, rebuilt.value);
+  return {
+    quantity: newQty,
+    avgCostBasis: total.mep.div(newQty),
+    avgCostBasisArs: total.ars.div(newQty),
+    avgCostBasisCcl: total.ccl.div(newQty),
+  };
 }
 
 /**
@@ -111,6 +151,44 @@ export function computeRebuild(input: RebuildInput): { quantity: Prisma.Decimal;
  */
 async function lockHolding(tx: Prisma.TransactionClient, portfolioId: string, assetId: string) {
   await tx.$executeRaw`SELECT id FROM holdings WHERE portfolio_id = ${portfolioId}::uuid AND asset_id = ${assetId}::uuid FOR UPDATE`;
+}
+
+/** The stored transaction fields the replay needs to derive its three currencies. */
+export interface StoredTransaction {
+  id: string;
+  type: Prisma.TransactionCreateInput["type"];
+  quantity: Prisma.Decimal;
+  price: Prisma.Decimal;
+  fee: Prisma.Decimal;
+  currency: string;
+  mepRate: Prisma.Decimal | null;
+  cclRate: Prisma.Decimal | null;
+}
+
+/**
+ * Convert a stored row into its three-currency replay form.
+ *
+ * A missing rate snapshot is an operational error, not a runtime path: the
+ * backfill populates every historical row and every new write records both
+ * rates. Guessing here would silently corrupt a cost basis, so name the row and
+ * stop instead.
+ */
+export function toReplayTransaction(t: StoredTransaction): ReplayTransaction {
+  if (t.mepRate === null || t.cclRate === null) {
+    throw new Error(
+      `Transaction ${t.id} is missing its FX rate snapshot (mepRate=${String(t.mepRate)}, cclRate=${String(t.cclRate)}). ` +
+        `Run 'pnpm --filter server backfill-currency' to populate historical rates.`,
+    );
+  }
+  const currency = currencySchema.parse(t.currency);
+  const rates = { mepRate: t.mepRate, cclRate: t.cclRate };
+  return {
+    id: t.id,
+    type: t.type === "SELL" ? "SELL" : "BUY",
+    quantity: t.quantity,
+    price: toMoney(t.price, currency, rates),
+    fee: toMoney(t.fee, currency, rates),
+  };
 }
 
 export interface RecomputeOptions {
@@ -144,10 +222,11 @@ export async function recomputeHolding(tx: Prisma.TransactionClient, portfolioId
 
   // createdAt breaks ties between same-day trades (bare dates are anchored at a
   // fixed UTC time), so the replay matches the order the position was built in.
-  const transactions = await tx.transaction.findMany({
+  const rows = await tx.transaction.findMany({
     where: { portfolioId, assetId, type: { in: ["BUY", "SELL"] } },
     orderBy: [{ transactedAt: "asc" }, { createdAt: "asc" }],
   });
+  const transactions = rows.map(toReplayTransaction);
 
   const existing = await tx.holding.findUnique({
     where: { portfolioId_assetId: { portfolioId, assetId } },
@@ -185,10 +264,7 @@ export async function recomputeHolding(tx: Prisma.TransactionClient, portfolioId
 
 // Base residual quantity (imported shares not explained by transactions),
 // mirroring computeRebuild's epsilon handling.
-function computeBaseQuantity(
-  holding: { quantity: Prisma.Decimal; avgCostBasis: Prisma.Decimal } | null,
-  explained: ReplayTransaction[],
-): Prisma.Decimal {
+function computeBaseQuantity(holding: { quantity: Prisma.Decimal } | null, explained: ReplayTransaction[]): Prisma.Decimal {
   const explainedQty = replayPosition(explained).quantity;
   const baseQty = (holding?.quantity ?? ZERO).minus(explainedQty);
   return baseQty.abs().lt(QTY_EPSILON) ? ZERO : baseQty;

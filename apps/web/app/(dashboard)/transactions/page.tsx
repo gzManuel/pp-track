@@ -1,15 +1,18 @@
 import { getUserId } from "@/lib/auth";
 import { serverFetchJson } from "@/lib/server-api";
+import { parseDisplayCurrency } from "@/lib/currency";
 import { parsePortfolioSelection } from "@/lib/portfolio-selection";
 import type { Portfolio, TransactionPage } from "@/lib/types";
 import LogTransactionForm from "../_components/transactions/LogTransactionForm";
+import CurrencyToggle from "../_components/CurrencyToggle";
 import PortfolioSwitcher from "../_components/portfolio/PortfolioSwitcher";
 import TransactionsTable from "../_components/transactions/TransactionsTable";
 
-export default async function TransactionsPage({ searchParams }: { searchParams: Promise<{ portfolio?: string }> }) {
+export default async function TransactionsPage({ searchParams }: { searchParams: Promise<{ portfolio?: string; currency?: string }> }) {
   const userId = await getUserId();
 
-  const { portfolio } = await searchParams;
+  const { portfolio, currency } = await searchParams;
+  const view = parseDisplayCurrency(currency);
 
   const portfolios = await serverFetchJson<Portfolio[]>("/api/portfolios", { userId });
 
@@ -54,7 +57,10 @@ export default async function TransactionsPage({ searchParams }: { searchParams:
     <>
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Transactions</h1>
-        <PortfolioSwitcher portfolios={portfolios} selectedIds={selectedIds} allSelected={allSelected} />
+        <div className="flex items-center gap-2">
+          <PortfolioSwitcher portfolios={portfolios} selectedIds={selectedIds} allSelected={allSelected} />
+          <CurrencyToggle />
+        </div>
       </div>
       <section className="mb-10 max-w-2xl">
         <h2 className="mb-3 text-lg font-medium">Log transaction</h2>
@@ -62,7 +68,12 @@ export default async function TransactionsPage({ searchParams }: { searchParams:
       </section>
       <section>
         <h2 className="mb-3 text-lg font-medium">History</h2>
-        <TransactionsTable transactions={transactions} showPortfolio={selectedPortfolios.length > 1} portfolios={portfolios} />
+        <TransactionsTable
+          transactions={transactions}
+          showPortfolio={selectedPortfolios.length > 1}
+          portfolios={portfolios}
+          viewCurrency={view}
+        />
       </section>
     </>
   );

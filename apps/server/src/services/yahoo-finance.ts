@@ -17,22 +17,40 @@ export interface QuoteResult {
 }
 
 /**
- * CEDEARs are tracked in USD via their `D` variant on BYMA (`.BA`), e.g.
- * `SPYD.BA`. Stripping the `D` gives the ARS-priced ticker, `SPY.BA`.
- * Non-BYMA tickers (and tickers without a `D` suffix) are returned as-is.
+ * The ARS-priced BYMA ticker, which is the canonical identity for a CEDEAR.
+ *
+ * A CEDEAR trades under three symbols on BYMA (`.BA`): the bare peso ticker
+ * (`SPY.BA`), the `D` variant settling in MEP dollars (`SPYD.BA`), and the `C`
+ * variant settling in cable dollars (`SPYC.BA`). All three are quote symbols for
+ * one instrument, so both suffixes are stripped to converge on a single Asset.
+ * Non-BYMA tickers, and BYMA tickers with neither suffix, are returned as-is.
+ *
+ * ⚠️ This is a *syntactic* strip and is therefore ambiguous: a base symbol that
+ * itself ends in D or C is indistinguishable from a variant suffix. `GLD.BA`
+ * (the peso CEDEAR for gold) reduces to a bogus `GL.BA`, and `GLDD.BA` is its
+ * real MEP variant. Do not use this to decide an asset's identity — call
+ * `resolveCanonicalTicker` in services/assets.ts, which disambiguates against
+ * the assets already registered and, failing that, against the upstream quote.
+ * It is safe for the inverse direction and for picking a symbol to quote.
  */
 export function toArsTicker(ticker: string): string {
-  if (!/D\.BA$/i.test(ticker)) return ticker;
-  return ticker.replace(/D\.BA$/i, ".BA");
+  return ticker.replace(/[DC]\.BA$/i, ".BA");
+}
+
+/** True when stripping a D/C suffix off `ticker` would change it. */
+export function hasVariantSuffix(ticker: string): boolean {
+  return /[DC]\.BA$/i.test(ticker);
 }
 
 /**
- * Inverse of `toArsTicker`: the USD `D` variant of a peso CEDEAR ticker,
- * `SPY.BA` -> `SPYD.BA`. Non-BYMA tickers (and existing `D` variants) pass through.
+ * The MEP-dollar `D` variant of a peso CEDEAR ticker, `SPY.BA` -> `SPYD.BA`.
+ * Non-BYMA tickers pass through; a `C` variant is rewritten to `D`, since this
+ * exists to pick the symbol to request a USD quote for.
  */
 export function toUsdTicker(ticker: string): string {
-  if (!/\.BA$/i.test(ticker) || /D\.BA$/i.test(ticker)) return ticker;
-  return ticker.replace(/\.BA$/i, "D.BA");
+  const ars = toArsTicker(ticker);
+  if (!/\.BA$/i.test(ars)) return ticker;
+  return ars.replace(/\.BA$/i, "D.BA");
 }
 
 export interface SymbolSearchResult {

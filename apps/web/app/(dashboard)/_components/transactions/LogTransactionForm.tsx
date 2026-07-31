@@ -4,6 +4,8 @@ import { useTransition } from "react";
 import { toast } from "sonner";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { CURRENCIES } from "@repo/api-contract";
+import { DEFAULT_CURRENCY, parseEntryCurrency } from "@/lib/currency";
 import { toTransactionPayload, transactionFormSchema, type TransactionFormValues } from "@/lib/schemas";
 import { Button } from "@/components/shadcn/Button";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/shadcn/Form";
@@ -51,7 +53,10 @@ export default function LogTransactionForm({
           type: transaction.type === "SELL" ? "SELL" : "BUY",
           quantity: String(Number(transaction.quantity)),
           price: String(Number(transaction.price)),
-          currency: transaction.currency === "ARS" ? "ARS" : "USD",
+          // Parse against the contract rather than narrowing by hand: a
+          // two-way ternary silently rewrote every non-ARS trade to one value,
+          // which would turn an edited CCL trade into a MEP one.
+          currency: parseEntryCurrency(transaction.currency),
           // Stored timestamps are anchored to a UTC calendar day — slice the ISO
           // date directly. Round-tripping through Date/toLocaleDateString would
           // shift the day for viewers west of UTC (e.g. Argentina, UTC-3).
@@ -65,7 +70,7 @@ export default function LogTransactionForm({
           type: "BUY",
           quantity: undefined,
           price: undefined,
-          currency: "USD",
+          currency: DEFAULT_CURRENCY,
           transactedAt: new Date().toLocaleDateString("en-CA"),
           fee: undefined,
           notes: "",
@@ -203,8 +208,11 @@ export default function LogTransactionForm({
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
-                    <SelectItem value="USD">USD</SelectItem>
-                    <SelectItem value="ARS">ARS</SelectItem>
+                    {CURRENCIES.map((c) => (
+                      <SelectItem key={c} value={c}>
+                        {c}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
                 <FormMessage />

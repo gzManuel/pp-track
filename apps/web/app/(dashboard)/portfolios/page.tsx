@@ -2,12 +2,16 @@ import Link from "next/link";
 import { getUserId } from "@/lib/auth";
 import { serverFetchJson } from "@/lib/server-api";
 import { fetchHoldings, fetchPriceData, summarizeHoldings } from "@/lib/holdings";
+import { currencySymbol, parseDisplayCurrency } from "@/lib/currency";
 import { formatMoney } from "@/lib/utils";
 import type { Portfolio } from "@/lib/types";
 import CreatePortfolioDialog from "../_components/portfolio/CreatePortfolioDialog";
 
-export default async function PortfoliosPage() {
+export default async function PortfoliosPage({ searchParams }: { searchParams: Promise<{ currency?: string }> }) {
   const userId = await getUserId();
+
+  const { currency } = await searchParams;
+  const view = parseDisplayCurrency(currency);
 
   const portfolios = await serverFetchJson<Portfolio[]>("/api/portfolios", { userId });
 
@@ -15,11 +19,11 @@ export default async function PortfoliosPage() {
   // tickers with a single /api/prices call instead of one call per portfolio.
   const holdingsLists = await Promise.all(portfolios.map((p) => fetchHoldings(userId, p.id)));
   const allTickers = holdingsLists.flat().map((h) => h.asset.ticker);
-  const { prices } = await fetchPriceData(allTickers);
+  const { prices } = await fetchPriceData(allTickers, view);
 
   const cards = portfolios.map((p, i) => ({
     portfolio: p,
-    summary: summarizeHoldings(holdingsLists[i] ?? [], prices),
+    summary: summarizeHoldings(holdingsLists[i] ?? [], prices, view),
   }));
 
   return (
@@ -46,17 +50,21 @@ export default async function PortfoliosPage() {
                     <span className="font-semibold">{p.name}</span>
                     {p.isDefault && <span className="text-xs text-muted-foreground border rounded-full px-2 py-0.5">Default</span>}
                   </div>
-                  <span className="text-sm text-muted-foreground">{p.currency}</span>
+                  <span className="text-sm text-muted-foreground">{view}</span>
                 </div>
 
                 <dl className="flex flex-col gap-1.5 text-sm">
                   <div className="flex items-center justify-between">
                     <dt className="text-muted-foreground">Total Invested</dt>
-                    <dd className="font-mono">{formatMoney(summary.totalInvested)}</dd>
+                    <dd className="font-mono">
+                      {currencySymbol(view)} {formatMoney(summary.totalInvested)}
+                    </dd>
                   </div>
                   <div className="flex items-center justify-between">
                     <dt className="text-muted-foreground">Market Value</dt>
-                    <dd className="font-mono">{formatMoney(summary.totalMarketValue)}</dd>
+                    <dd className="font-mono">
+                      {currencySymbol(view)} {formatMoney(summary.totalMarketValue)}
+                    </dd>
                   </div>
                   <div className="flex items-center justify-between">
                     <dt className="text-muted-foreground">Gain/Loss</dt>

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { currencySchema } from "./enums.js";
 import { isoDateTime } from "./primitives.js";
 
 /**
@@ -16,17 +17,25 @@ export const priceResultSchema = z.object({
   recordedAt: isoDateTime.optional(),
   /** True when served from the price-snapshot cache rather than a live fetch. */
   cached: z.boolean().optional(),
-  /** ARS-per-USD rate applied server-side; present only for `?currency=ARS`. */
+  /**
+   * ARS-per-USD rates the server used, echoed so callers can convert their own
+   * figures consistently. Present whenever a rate was needed to produce the
+   * requested currency.
+   */
   mepRate: z.string().optional(),
+  cclRate: z.string().optional(),
   error: z.string().optional(),
 });
 
 export type PriceResult = z.infer<typeof priceResultSchema>;
 
-/** Query string of the prices endpoint. `tickers` is a comma-separated list. */
+/**
+ * Query string of the prices endpoint. `tickers` is a comma-separated list.
+ * `currency` selects the view (ARS/MEP/CCL) and defaults to MEP.
+ */
 export const priceQuerySchema = z.object({
   tickers: z.string().min(1, "tickers query param is required"),
-  currency: z.string().optional(),
+  currency: currencySchema.default("MEP"),
 });
 
 export type PriceQuery = z.infer<typeof priceQuerySchema>;

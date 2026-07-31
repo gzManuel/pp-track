@@ -2,6 +2,7 @@ import type { FastifyPluginAsync } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
 import {
+  currencySchema,
   errorResponseSchema,
   transactionListQuerySchema,
   transactionPageSchema,
@@ -22,9 +23,9 @@ export const createTransactionBody = z.object({
   type: z.preprocess((v) => (typeof v === "string" ? v.toUpperCase() : v), transactionTypeSchema),
   quantity: z.number().positive(),
   price: z.number().nonnegative(),
-  // Wider than the contract's currency enum on purpose: the server also accepts
-  // whatever currency an imported/legacy row carries, and normalizes to USD.
-  currency: z.string().min(1),
+  // Narrowed to the contract's set: nothing is normalized on write any more, so
+  // a currency we can't derive the other two views from must be rejected here.
+  currency: currencySchema,
   // A bare YYYY-MM-DD (from <input type="date">) is anchored at noon UTC so the
   // calendar day can't shift under any timezone (UTC-11..+12); anything else
   // falls through to normal date coercion/validation. (Rows created before this
@@ -103,6 +104,8 @@ const transactionsRoutes: FastifyPluginAsync = async (fastify) => {
         price,
         currency,
         fee: txFee,
+        mepRate,
+        cclRate,
       } = await resolveTransactionAsset(app.prisma, {
         ticker: request.body.ticker,
         price: request.body.price,
@@ -121,9 +124,12 @@ const transactionsRoutes: FastifyPluginAsync = async (fastify) => {
             assetId,
             type, // already normalized to uppercase by the schema
             quantity,
+            // Stored exactly as entered — see services/assets.ts.
             price,
             currency,
             fee: txFee,
+            mepRate,
+            cclRate,
             notes,
             transactedAt, // already a Date via z.coerce.date()
           },
@@ -164,7 +170,7 @@ const transactionsRoutes: FastifyPluginAsync = async (fastify) => {
       }
 
       const { type, quantity, transactedAt, notes } = request.body;
-      const { asset, price, currency, fee } = await resolveTransactionAsset(app.prisma, {
+      const { asset, price, currency, fee, mepRate, cclRate } = await resolveTransactionAsset(app.prisma, {
         ticker: request.body.ticker,
         price: request.body.price,
         currency: request.body.currency,
@@ -192,6 +198,10 @@ const transactionsRoutes: FastifyPluginAsync = async (fastify) => {
             price,
             currency,
             fee,
+            // Re-snapshotted: an edit may move the trade to a different date,
+            // and the rates must match the date actually stored.
+            mepRate,
+            cclRate,
             notes,
             transactedAt,
           },

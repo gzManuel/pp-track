@@ -123,6 +123,8 @@ describe("portfolio routes", () => {
           assetId: ASSET_ID,
           quantity: dec("10.50000000"),
           avgCostBasis: dec("183.33333333"),
+          avgCostBasisArs: dec("275000.00000000"),
+          avgCostBasisCcl: dec("171.87500000"),
           createdAt: new Date("2026-01-01T00:00:00.000Z"),
           updatedAt: new Date("2026-01-01T00:00:00.000Z"),
           asset: { ticker: "AAPL", name: "Apple Inc.", currency: "USD", assetType: "EQUITY" },
@@ -136,6 +138,9 @@ describe("portfolio routes", () => {
       // Full precision preserved — a float round-trip would lose the tail.
       expect(holding?.quantity).toBe("10.5");
       expect(holding?.avgCostBasis).toBe("183.33333333");
+      // All three bases are carried at full precision, not just the MEP one.
+      expect(holding?.avgCostBasisArs).toBe("275000");
+      expect(holding?.avgCostBasisCcl).toBe("171.875");
     });
 
     it("400s on a non-UUID portfolio id", async () => {
