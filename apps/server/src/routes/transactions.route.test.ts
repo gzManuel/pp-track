@@ -17,13 +17,21 @@ import {
 } from "../test-support/fixtures.js";
 
 // The asset-resolution path reaches the network; route tests care about the
-// HTTP layer, so keep Yahoo and the MEP feed out of it entirely.
+// HTTP layer, so keep Yahoo and the FX rate feed out of it entirely.
+export const TEST_MEP = 1449.4;
+export const TEST_CCL = 1501.95;
+
+vi.mock("../services/fx-rates.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../services/fx-rates.js")>()),
+  getRates: vi.fn(async () => ({ mepRate: 1449.4, cclRate: 1501.95 })),
+}));
+
 vi.mock("../services/yahoo-finance.js", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../services/yahoo-finance.js")>()),
   fetchQuote: vi.fn(async () => ({
     symbol: "AAPL",
     price: 100,
-    currency: "USD",
+    currency: "MEP",
     name: "Apple Inc.",
     quoteType: "EQUITY",
     exchange: "NMS",
@@ -164,6 +172,87 @@ describe("transaction routes", () => {
       // The holding row is rebuilt in the same interactive transaction.
       expect(prisma.$transaction).toHaveBeenCalled();
       expect(prisma.holding.create).toHaveBeenCalled();
+    });
+
+    // Regression tests for the two CEDEAR bugs: a peso purchase used to be
+    // divided by the MEP rate and filed under the D-variant ticker, losing both
+    // the entered price and the asset's identity.
+    describe("CEDEAR trades", () => {
+      const cedearAsset = { ...assetRow, ticker: "SPY.BA", exchange: "BUE", currency: "ARS" };
+
+      beforeEach(() => {
+        prisma.portfolio.findFirst.mockResolvedValue(portfolioRow);
+        prisma.asset.findFirst.mockResolvedValue(cedearAsset);
+        prisma.transaction.findMany.mockResolvedValue([]);
+        prisma.holding.findUnique.mockResolvedValue(null);
+        prisma.holding.create.mockResolvedValue({});
+      });
+
+      it("stores a peso purchase in ARS at the price entered", async () => {
+        prisma.transaction.create.mockResolvedValue(transactionRow({ currency: "ARS", price: dec("1909.62") }));
+
+        const res = await app.inject({
+          method: "POST",
+          url: `/api/portfolios/${PORTFOLIO_ID}/transactions`,
+          headers: auth,
+          payload: { ...validTransactionBody, ticker: "SPY.BA", currency: "ARS", price: 1909.62 },
+        });
+
+        expect(res.statusCode).toBe(201);
+        const written = prisma.transaction.create.mock.calls[0]?.[0] as { data: Record<string, unknown> };
+        expect(written.data.currency).toBe("ARS");
+        expect(written.data.price).toBe(1909.62); // not divided by any rate
+        // Both rates are captured so the MEP and CCL views can be derived.
+        expect(written.data.mepRate).toBe(TEST_MEP);
+        expect(written.data.cclRate).toBe(TEST_CCL);
+      });
+
+      it.each([
+        ["the peso ticker", "SPY.BA"],
+        ["the MEP D-variant", "SPYD.BA"],
+        ["the CCL C-variant", "SPYC.BA"],
+      ])("resolves %s onto the single SPY.BA asset", async (_label, ticker) => {
+        prisma.transaction.create.mockResolvedValue(transactionRow());
+
+        const res = await app.inject({
+          method: "POST",
+          url: `/api/portfolios/${PORTFOLIO_ID}/transactions`,
+          headers: auth,
+          payload: { ...validTransactionBody, ticker, currency: "ARS" },
+        });
+
+        expect(res.statusCode).toBe(201);
+        // All three quote symbols are looked up under one canonical identity.
+        expect(prisma.asset.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: { ticker: "SPY.BA" } }));
+      });
+
+      it("stores a CCL purchase as CCL rather than folding it into MEP", async () => {
+        prisma.transaction.create.mockResolvedValue(transactionRow({ currency: "CCL" }));
+
+        const res = await app.inject({
+          method: "POST",
+          url: `/api/portfolios/${PORTFOLIO_ID}/transactions`,
+          headers: auth,
+          payload: { ...validTransactionBody, ticker: "SPYC.BA", currency: "CCL", price: 1.29 },
+        });
+
+        expect(res.statusCode).toBe(201);
+        const written = prisma.transaction.create.mock.calls[0]?.[0] as { data: Record<string, unknown> };
+        expect(written.data.currency).toBe("CCL");
+        expect(written.data.price).toBe(1.29);
+      });
+
+      it("rejects a currency outside the contract", async () => {
+        const res = await app.inject({
+          method: "POST",
+          url: `/api/portfolios/${PORTFOLIO_ID}/transactions`,
+          headers: auth,
+          payload: { ...validTransactionBody, currency: "USD" },
+        });
+
+        expect(res.statusCode).toBe(400);
+        expect(prisma.transaction.create).not.toHaveBeenCalled();
+      });
     });
 
     it("lowercases types are normalized before reaching the database", async () => {

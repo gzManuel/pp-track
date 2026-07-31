@@ -4,14 +4,16 @@
  * market value / gain" instead of per-page copies.
  */
 
+import type { Currency } from "@repo/api-contract";
+import { costBasisFor, DEFAULT_CURRENCY } from "./currency";
 import { serverFetchJson } from "./server-api";
 import type { EnrichedHolding, PriceResult, RawHolding } from "./types";
 
 export interface PriceData {
   /** Latest price per requested ticker; failed lookups are simply absent. */
   prices: Map<string, number>;
-  /** ARS-per-USD rate the backend applied (only set for ARS requests). */
-  mepRate: number | null;
+  /** The currency the prices are quoted in. */
+  currency: Currency;
 }
 
 export function fetchHoldings(userId: string, portfolioId: string): Promise<RawHolding[]> {
@@ -19,21 +21,17 @@ export function fetchHoldings(userId: string, portfolioId: string): Promise<RawH
 }
 
 /** One /api/prices call for the whole ticker set (deduped). */
-export async function fetchPriceData(tickers: string[], ars = false): Promise<PriceData> {
+export async function fetchPriceData(tickers: string[], currency: Currency = DEFAULT_CURRENCY): Promise<PriceData> {
   const prices = new Map<string, number>();
-  let mepRate: number | null = null;
 
   const unique = [...new Set(tickers)].filter(Boolean);
-  if (unique.length === 0) return { prices, mepRate };
+  if (unique.length === 0) return { prices, currency };
 
-  const results = await serverFetchJson<PriceResult[]>(
-    `/api/prices?tickers=${encodeURIComponent(unique.join(","))}${ars ? "&currency=ARS" : ""}`,
-  );
+  const results = await serverFetchJson<PriceResult[]>(`/api/prices?tickers=${encodeURIComponent(unique.join(","))}&currency=${currency}`);
   for (const r of results) {
     if (r.price) prices.set(r.ticker, Number(r.price));
-    if (mepRate === null && r.mepRate) mepRate = Number(r.mepRate);
   }
-  return { prices, mepRate };
+  return { prices, currency };
 }
 
 export interface Position {
@@ -50,12 +48,15 @@ export interface Position {
 /**
  * Merge raw holdings by ticker so the same asset held in several portfolios
  * collapses into a single position with summed shares and blended cost basis.
+ *
+ * The basis is taken in `currency` — the amount actually paid in it — so the
+ * merge happens in one currency throughout and never mixes units.
  */
-export function mergeByTicker(rawHoldings: RawHolding[]): Position[] {
+export function mergeByTicker(rawHoldings: RawHolding[], currency: Currency = DEFAULT_CURRENCY): Position[] {
   const byTicker = new Map<string, Position>();
   for (const h of rawHoldings) {
     const shares = Number(h.quantity);
-    const costBasis = shares * Number(h.avgCostBasis);
+    const costBasis = shares * costBasisFor(h, currency);
     const existing = byTicker.get(h.asset.ticker);
     if (existing) {
       existing.shares += shares;
@@ -76,14 +77,17 @@ export function mergeByTicker(rawHoldings: RawHolding[]): Position[] {
 }
 
 /**
- * Attach prices and derived gain figures. When the prices were requested in
- * ARS, USD cost bases are converted with the same MEP rate the backend used
- * for the prices, so gain always compares like-for-like in one currency.
+ * Attach prices and derived gain figures.
+ *
+ * No FX conversion happens here any more. `positions` already carry the cost
+ * actually paid in the display currency, and `priceData` was fetched in that
+ * same currency, so both sides of the gain are natively like-for-like. This is
+ * what makes the ARS view show real peso performance instead of a dollar basis
+ * revalued at today's rate.
  */
 export function enrichPositions(positions: Position[], priceData: PriceData): EnrichedHolding[] {
   const enriched: EnrichedHolding[] = positions.map((p) => {
-    const fx = priceData.mepRate !== null && p.currency === "USD" ? priceData.mepRate : 1;
-    const costBasis = p.costBasis * fx;
+    const costBasis = p.costBasis;
     const avgCost = p.shares !== 0 ? costBasis / p.shares : 0;
     const currentPrice = priceData.prices.get(p.ticker) ?? null;
     const marketValue = currentPrice !== null ? p.shares * currentPrice : null;
@@ -121,15 +125,22 @@ export interface PortfolioSummary {
 }
 
 /**
- * Aggregate totals for one portfolio's holdings. A position with no price
- * falls back to its cost basis so the market value isn't understated.
+ * Aggregate totals for one portfolio's holdings, in `currency`. A position with
+ * no price falls back to its cost basis so the market value isn't understated.
+ *
+ * Takes the basis in the same currency the prices were fetched in, for the same
+ * reason as `enrichPositions` — the two must not be mixed.
  */
-export function summarizeHoldings(rawHoldings: RawHolding[], prices: Map<string, number>): PortfolioSummary {
+export function summarizeHoldings(
+  rawHoldings: RawHolding[],
+  prices: Map<string, number>,
+  currency: Currency = DEFAULT_CURRENCY,
+): PortfolioSummary {
   let totalInvested = 0;
   let totalMarketValue = 0;
   for (const h of rawHoldings) {
     const shares = Number(h.quantity);
-    const costBasis = shares * Number(h.avgCostBasis);
+    const costBasis = shares * costBasisFor(h, currency);
     const currentPrice = prices.get(h.asset.ticker) ?? null;
     totalInvested += costBasis;
     totalMarketValue += currentPrice !== null ? shares * currentPrice : costBasis;

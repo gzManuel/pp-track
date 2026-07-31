@@ -59,13 +59,21 @@ model Asset {
 }
 
 model Holding {
-  id           String   @id @default(uuid()) @db.Uuid
-  portfolioId  String   @map("portfolio_id") @db.Uuid
-  assetId      String   @map("asset_id") @db.Uuid
-  quantity     Decimal  @db.Decimal(18, 8)
-  avgCostBasis Decimal  @map("avg_cost_basis") @db.Decimal(18, 8)
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
+  id          String @id @default(uuid()) @db.Uuid
+  portfolioId String @map("portfolio_id") @db.Uuid
+  assetId     String @map("asset_id") @db.Uuid
+  quantity    Decimal @db.Decimal(18, 8)
+
+  // Average cost basis, maintained in all three currencies by the replay in
+  // services/holdings.ts. Each is the real amount paid in that currency, not a
+  // conversion of the others at today's rate — so the ARS basis is the pesos
+  // actually spent. `avgCostBasis` keeps its original name and means MEP.
+  avgCostBasis    Decimal @map("avg_cost_basis") @db.Decimal(18, 8)
+  avgCostBasisArs Decimal @default(0) @map("avg_cost_basis_ars") @db.Decimal(18, 8)
+  avgCostBasisCcl Decimal @default(0) @map("avg_cost_basis_ccl") @db.Decimal(18, 8)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   portfolio Portfolio @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
   asset     Asset     @relation(fields: [assetId], references: [id])
@@ -81,18 +89,40 @@ enum TransactionType {
   FEE
 }
 
+/// The currency a trade was entered in. MEP and CCL are both US dollars and
+/// differ only in settlement (local vs. cable); the pre-existing `USD` value was
+/// ambiguous about which and is migrated to MEP. Mirrors CURRENCIES in
+/// @repo/api-contract.
+enum Currency {
+  ARS
+  MEP
+  CCL
+}
+
 model Transaction {
-  id          String   @id @default(uuid()) @db.Uuid
-  portfolioId String   @map("portfolio_id") @db.Uuid
-  assetId     String   @map("asset_id") @db.Uuid
+  id          String @id @default(uuid()) @db.Uuid
+  portfolioId String @map("portfolio_id") @db.Uuid
+  assetId     String @map("asset_id") @db.Uuid
   type        TransactionType
-  quantity    Decimal  @db.Decimal(18, 8)
-  price       Decimal  @db.Decimal(18, 8)
-  fee         Decimal  @default(0) @db.Decimal(18, 8)
-  currency    String   @default("USD")
+  quantity    Decimal @db.Decimal(18, 8)
+
+  // Price and fee are stored exactly as entered, in `currency` — one of
+  // ARS/MEP/CCL. Nothing is converted on write; the other two views are derived
+  // from the rate snapshot below, so no entered amount is ever lost.
+  price    Decimal  @db.Decimal(18, 8)
+  fee      Decimal  @default(0) @db.Decimal(18, 8)
+  currency Currency @default(MEP)
+
+  // ARS per USD on `transactedAt`, captured when the trade is written. Both are
+  // recorded regardless of `currency`, since expressing a trade in the other two
+  // currencies needs both. Nullable only for legacy rows the backfill could not
+  // resolve; every new write populates them.
+  mepRate Decimal? @map("mep_rate") @db.Decimal(18, 8)
+  cclRate Decimal? @map("ccl_rate") @db.Decimal(18, 8)
+
   transactedAt DateTime @map("transacted_at")
-  notes       String?
-  createdAt   DateTime @default(now()) @map("created_at")
+  notes        String?
+  createdAt    DateTime @default(now()) @map("created_at")
 
   portfolio Portfolio @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
   asset     Asset     @relation(fields: [assetId], references: [id])
@@ -114,6 +144,28 @@ model PriceSnapshot {
 
   @@index([assetId, recordedAt])
   @@map("price_snapshots")
+}
+
+/// Audit trail of the CEDEAR unification migration
+/// (20260731140000_cedear_multi_currency).
+///
+/// Records what each affected transaction looked like before its `*D.BA` asset
+/// was merged into the peso ticker and its converted price restored — the
+/// variant asset rows are deleted, so this is the only remaining record of
+/// which trades were rewritten. `scripts/backfill-currency.ts` reads it to know
+/// what to repair, and `restored` makes that repair re-runnable.
+///
+/// Safe to drop once the restored prices have been eyeballed and are correct.
+model CedearMigrationLog {
+  transactionId String  @id @map("transaction_id") @db.Uuid
+  oldTicker     String  @map("old_ticker")
+  newTicker     String  @map("new_ticker")
+  oldCurrency   String  @map("old_currency")
+  oldPrice      Decimal @map("old_price") @db.Decimal(18, 8)
+  oldFee        Decimal @map("old_fee") @db.Decimal(18, 8)
+  restored      Boolean @default(false)
+
+  @@map("cedear_migration_log")
 }
 
 model Watchlist {

@@ -1,5 +1,6 @@
 "use client";
 
+import { displayTicker } from "@/lib/currency";
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/shadcn/Table";
 import type { EnrichedHolding } from "@/lib/types";
 import { formatMoney as fmt } from "@/lib/utils";
@@ -61,7 +62,10 @@ export default function HoldingsTable({ holdings, priceCurrency = "USD" }: { hol
       <TableBody>
         {holdings.map((h) => (
           <TableRow key={h.id}>
-            <TableCell className="font-mono font-medium">{h.ticker}</TableCell>
+            <TableCell className="font-mono font-medium">
+              {displayTicker(h.ticker).label}
+              {displayTicker(h.ticker).isCedear && <span className="ml-1.5 text-[10px] font-sans text-muted-foreground">CEDEAR</span>}
+            </TableCell>
             <TableCell className="text-sm text-muted-foreground">{h.name}</TableCell>
             <TableCell className="text-right font-mono">{fmtShares(h.shares)}</TableCell>
             <TableCell className="text-right font-mono">{fmt(h.avgCost, 4)}</TableCell>

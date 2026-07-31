@@ -32,7 +32,14 @@ export const holdingSchema = z.object({
   portfolioId: z.uuid(),
   assetId: z.uuid(),
   quantity: decimalString,
+  /**
+   * Average cost basis in each currency — the amount actually paid in that
+   * currency, not a conversion of the others at today's rate. `avgCostBasis`
+   * is the MEP figure (its name predates the other two).
+   */
   avgCostBasis: decimalString,
+  avgCostBasisArs: decimalString,
+  avgCostBasisCcl: decimalString,
   createdAt: isoDateTime,
   updatedAt: isoDateTime,
   asset: z.object({

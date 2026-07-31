@@ -15,7 +15,8 @@
     "lint": "eslint --max-warnings 0",
     "check-types": "tsc --noEmit",
     "test": "vitest run",
-    "import-portfolio": "tsx scripts/import-portfolio.ts"
+    "import-portfolio": "tsx scripts/import-portfolio.ts",
+    "backfill-currency": "tsx scripts/backfill-currency.ts"
   },
   "dependencies": {
     "@fastify/rate-limit": "^11.1.0",

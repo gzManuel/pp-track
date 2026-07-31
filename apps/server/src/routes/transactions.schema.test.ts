@@ -6,7 +6,7 @@ const base = {
   type: "BUY",
   quantity: 1,
   price: 100,
-  currency: "USD",
+  currency: "MEP",
   transactedAt: "2026-07-22",
 };
 

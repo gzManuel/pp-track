@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { decimalString, isoDateTime } from "./primitives.js";
-import { transactionTypeSchema } from "./enums.js";
+import { currencySchema, transactionTypeSchema } from "./enums.js";
 
 /** A transaction as returned by the create/update/list endpoints. */
 export const transactionSchema = z.object({
@@ -9,9 +9,17 @@ export const transactionSchema = z.object({
   assetId: z.uuid(),
   type: transactionTypeSchema,
   quantity: decimalString,
+  /** Price and fee as entered, denominated in `currency`. Never converted. */
   price: decimalString,
   fee: decimalString,
-  currency: z.string(),
+  currency: currencySchema,
+  /**
+   * ARS per USD on `transactedAt`, captured at write time. Together with
+   * `currency` these let a client render the trade in any of the three
+   * currencies. Null only on legacy rows the backfill could not resolve.
+   */
+  mepRate: decimalString.nullable(),
+  cclRate: decimalString.nullable(),
   transactedAt: isoDateTime,
   notes: z.string().nullable(),
   createdAt: isoDateTime,
