@@ -8,30 +8,31 @@ export interface PortfolioSelection {
 
 /**
  * Resolve the `?portfolio=` search param into a portfolio selection — the one
- * interpretation shared by every page: absent → the default (or first)
- * portfolio, "all" → everything, "none" → explicit empty selection, and a
- * comma list → that subset.
+ * interpretation shared by every page: absent (or empty) → everything, same as
+ * "all", "none" → explicit empty selection, and a comma list → that subset.
+ *
+ * `isDefault` deliberately plays no part here: it decides which portfolio a new
+ * transaction is pre-assigned to, not what you land on.
  */
 export function parsePortfolioSelection(param: string | undefined, portfolios: Portfolio[]): PortfolioSelection {
-  const showAll = param === "all";
+  const showAll = !param || param === "all";
   const explicitNone = param === "none";
-  const ids = param && !showAll && !explicitNone ? param.split(",").filter(Boolean) : [];
-  const defaultPortfolio = portfolios.find((p) => p.isDefault) ?? portfolios[0];
+  const ids = showAll || explicitNone ? [] : param.split(",").filter(Boolean);
 
   let selected: Portfolio[];
   if (showAll) {
     selected = portfolios;
   } else if (ids.length > 0) {
     selected = portfolios.filter((p) => ids.includes(p.id));
-  } else if (explicitNone || !defaultPortfolio) {
-    selected = [];
   } else {
-    selected = [defaultPortfolio];
+    selected = [];
   }
 
   return {
     selected,
     selectedIds: selected.map((p) => p.id),
-    allSelected: showAll || (!explicitNone && ids.length === 0),
+    // Derived from the resolved selection rather than re-read from the param,
+    // so the switcher can never claim a state the page isn't rendering.
+    allSelected: portfolios.length > 0 && selected.length === portfolios.length,
   };
 }

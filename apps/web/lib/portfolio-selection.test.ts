@@ -21,15 +21,27 @@ const C = portfolio("c", "Gamma", false);
 const ALL = [A, B, C];
 
 describe("parsePortfolioSelection", () => {
-  it("absent param selects the default portfolio", () => {
+  it("absent param selects every portfolio", () => {
     const s = parsePortfolioSelection(undefined, ALL);
-    expect(s.selectedIds).toEqual(["b"]);
-    expect(s.allSelected).toBe(true); // switcher shows the implicit-default state as all
+    expect(s.selectedIds).toEqual(["a", "b", "c"]);
+    expect(s.allSelected).toBe(true);
   });
 
-  it("absent param falls back to the first portfolio when none is default", () => {
-    const s = parsePortfolioSelection(undefined, [A, C]);
-    expect(s.selectedIds).toEqual(["a"]);
+  // The default portfolio decides what a new transaction is pre-assigned to,
+  // not what the dashboard lands on.
+  it("absent param ignores which portfolio is the default", () => {
+    const noDefault = [A, portfolio("b", "Beta", false), C];
+    const s = parsePortfolioSelection(undefined, noDefault);
+    expect(s.selectedIds).toEqual(["a", "b", "c"]);
+    expect(s.allSelected).toBe(true);
+  });
+
+  it("an absent param and 'all' are equivalent", () => {
+    expect(parsePortfolioSelection(undefined, ALL)).toEqual(parsePortfolioSelection("all", ALL));
+  });
+
+  it("an empty param behaves as absent", () => {
+    expect(parsePortfolioSelection("", ALL)).toEqual(parsePortfolioSelection(undefined, ALL));
   });
 
   it("'all' selects everything", () => {
@@ -48,6 +60,13 @@ describe("parsePortfolioSelection", () => {
     const s = parsePortfolioSelection("c,a", ALL);
     expect(s.selectedIds).toEqual(["a", "c"]);
     expect(s.allSelected).toBe(false);
+  });
+
+  // allSelected is derived from the resolved selection, so a hand-typed URL
+  // naming every id reports the same state as "all".
+  it("a comma list naming every portfolio counts as all selected", () => {
+    const s = parsePortfolioSelection("c,a,b", ALL);
+    expect(s.allSelected).toBe(true);
   });
 
   it("stale ids are dropped silently", () => {

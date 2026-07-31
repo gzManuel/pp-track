@@ -33,7 +33,9 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
 
   const { selected: selectedPortfolios, selectedIds, allSelected } = parsePortfolioSelection(portfolio, portfolios);
 
-  const primaryPortfolio = selectedPortfolios[0];
+  // Prefer the default within the selection — it seeds the "Log transaction"
+  // dialog, and the selection is now every portfolio in API order by default.
+  const primaryPortfolio = selectedPortfolios.find((p) => p.isDefault) ?? selectedPortfolios[0];
   if (!primaryPortfolio) {
     return (
       <>

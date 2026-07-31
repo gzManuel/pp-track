@@ -23,7 +23,8 @@ export default async function TransactionsPage({ searchParams }: { searchParams:
     return <p className="py-20 text-center text-sm text-muted-foreground">No portfolio yet. Create one from the Portfolios tab.</p>;
   }
 
-  const primaryPortfolio = selectedPortfolios[0] ?? portfolios.find((p) => p.isDefault) ?? firstPortfolio;
+  const primaryPortfolio =
+    selectedPortfolios.find((p) => p.isDefault) ?? selectedPortfolios[0] ?? portfolios.find((p) => p.isDefault) ?? firstPortfolio;
 
   if (selectedPortfolios.length === 0) {
     return (
