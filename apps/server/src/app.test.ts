@@ -19,7 +19,7 @@ describe("app", () => {
   });
 
   describe("GET /health", () => {
-    it("reports ok when the database answers", async () => {
+    it("should report ok when the database answers", async () => {
       prisma.$queryRaw.mockResolvedValue([{ "?column?": 1 }]);
 
       const res = await app.inject({ method: "GET", url: "/health" });
@@ -28,7 +28,7 @@ describe("app", () => {
       expect(res.json()).toEqual({ status: "ok" });
     });
 
-    it("503s with a generic body when the database is unreachable", async () => {
+    it("should return 503 with a generic body when the database is unreachable", async () => {
       prisma.$queryRaw.mockRejectedValue(new Error("connect ECONNREFUSED 10.0.0.5:5432"));
 
       const res = await app.inject({ method: "GET", url: "/health" });
@@ -40,7 +40,7 @@ describe("app", () => {
       expect(res.body).not.toContain("10.0.0.5");
     });
 
-    it("needs no authentication", async () => {
+    it("should need no authentication", async () => {
       prisma.$queryRaw.mockResolvedValue([{ "?column?": 1 }]);
       const res = await app.inject({ method: "GET", url: "/health" });
       expect(res.statusCode).toBe(200);
@@ -48,7 +48,7 @@ describe("app", () => {
   });
 
   describe("error handler", () => {
-    it("forwards an HttpError's status and message for client errors", async () => {
+    it("should forward an HttpError's status and message for client errors", async () => {
       app.get("/boom-422", async () => {
         throw new HttpError(422, "Cannot sell more than the quantity held at that date");
       });
@@ -60,7 +60,7 @@ describe("app", () => {
       expect(res.json()).toEqual({ error: "Cannot sell more than the quantity held at that date" });
     });
 
-    it("hides the message of an unexpected server-side failure", async () => {
+    it("should hide the message of an unexpected server-side failure", async () => {
       app.get("/boom-500", async () => {
         throw new Error("Invalid `prisma.user.findMany()` invocation: column users.secret_column");
       });
@@ -74,7 +74,7 @@ describe("app", () => {
       expect(res.body).not.toContain("prisma");
     });
 
-    it("treats a 500-coded HttpError as opaque too", async () => {
+    it("should treat a 500-coded HttpError as opaque too", async () => {
       app.get("/boom-503", async () => {
         throw new HttpError(503, "upstream pool exhausted at db-primary-1");
       });
@@ -89,7 +89,7 @@ describe("app", () => {
   });
 
   describe("prisma plugin lifecycle", () => {
-    it("does not disconnect a caller-supplied client", async () => {
+    it("should not disconnect a caller-supplied client", async () => {
       await app.close();
       // The test owns this client; closing the app must not tear it down.
       expect(prisma.$disconnect).not.toHaveBeenCalled();

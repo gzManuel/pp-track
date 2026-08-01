@@ -6,9 +6,11 @@
   "license": "BUSL-1.1",
   "exports": {
     "./base": "./base.js",
-    "./next-js": "./next.js"
+    "./next-js": "./next.js",
+    "./test": "./test.js"
   },
   "dependencies": {
+    "@eslint-community/eslint-plugin-eslint-comments": "^4.4.0",
     "@eslint/js": "^9.39.1",
     "@next/eslint-plugin-next": "^16.2.0",
     "eslint-config-prettier": "^10.1.1",

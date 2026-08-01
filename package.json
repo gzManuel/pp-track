@@ -11,6 +11,7 @@
     "format:check": "prettier --check \"**/*.{ts,tsx,js,mjs,md,json,css}\"",
     "check-types": "turbo run check-types",
     "test": "turbo run test",
+    "test:coverage": "turbo run coverage",
     "prepare": "husky"
   },
   "devDependencies": {

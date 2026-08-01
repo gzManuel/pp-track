@@ -54,6 +54,12 @@ Core models in `apps/server/prisma/schema.prisma`:
 
 All monetary quantities use `Decimal(18,8)`. UUIDs are used for all primary keys.
 
+## Testing conventions
+
+All test titles (in `it(...)` and `it.each(...)` blocks) must start with **"should "** (e.g., `"should return 200 when authorized"`, `"should throw when portfolio doesn't exist"`). This convention is documented here and applied across all 22 test files in the repo.
+
+Every `eslint-disable` or `eslint-disable-next-line` directive in a test file **must include a reason comment** (e.g., `// -- vi.fn().mock is untyped`); stale disables are flagged by `eslint-plugin-eslint-comments`. File-top blanket disables are not allowed — use scoped, line-specific disables only.
+
 ## Frontend conventions
 
 - shadcn/ui components live in `apps/web/components/ui/` — add new ones via `pnpm dlx shadcn add <component>` from `apps/web/`

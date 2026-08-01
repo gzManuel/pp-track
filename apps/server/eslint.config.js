@@ -2,12 +2,14 @@ import { fileURLToPath } from "url";
 import path from "path";
 import tseslint from "typescript-eslint";
 import { config as baseConfig } from "@repo/eslint-config/base";
+import { config as testConfig } from "@repo/eslint-config/test";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 /** @type {import("eslint").Linter.Config[]} */
 export default tseslint.config(
   ...baseConfig,
+  ...testConfig,
   {
     // CommonJS by design (pm2 reads it as CJS); the flat config's ESM globals
     // would flag `module`/`__dirname`.
@@ -40,6 +42,14 @@ export default tseslint.config(
       // no top-level await (the type provider and route registration require it),
       // so require-await is pure noise in this codebase.
       "@typescript-eslint/require-await": "off",
+    },
+  },
+  {
+    // Test-specific rule overrides (applied after strict type checking).
+    files: ["src/**/*.test.ts"],
+    rules: {
+      // Non-null assertions are necessary when accessing mock.calls arrays in tests.
+      "@typescript-eslint/no-non-null-assertion": "off",
     },
   },
 );

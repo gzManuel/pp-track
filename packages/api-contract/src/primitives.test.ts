@@ -16,19 +16,19 @@ class FakeDecimal {
 }
 
 describe("decimalString", () => {
-  it("stringifies a Decimal-like value without losing precision", () => {
+  it("should stringify a Decimal-like value without losing precision", () => {
     expect(decimalString.parse(new FakeDecimal("183.33333333"))).toBe("183.33333333");
   });
 
-  it("keeps trailing-zero-free string input as-is", () => {
+  it("should keep trailing-zero-free string input as-is", () => {
     expect(decimalString.parse("10.5")).toBe("10.5");
   });
 
-  it("accepts numbers", () => {
+  it("should accept numbers", () => {
     expect(decimalString.parse(100)).toBe("100");
   });
 
-  it.each([[{}], [[]], [null], [undefined], [true]])("rejects %s so a wrong shape fails serialization loudly", (value) => {
+  it.each([[{}], [[]], [null], [undefined], [true]])("should reject %s so a wrong shape fails serialization loudly", (value) => {
     expect(decimalString.safeParse(value).success).toBe(false);
   });
 });
@@ -36,22 +36,22 @@ describe("decimalString", () => {
 describe("isoDateTime", () => {
   const date = new Date("2026-01-15T12:00:00.000Z");
 
-  it("emits exactly what JSON.stringify would have produced for a Date", () => {
+  it("should emit exactly what JSON.stringify would have produced for a Date", () => {
     // The payload must be byte-identical to the pre-contract behaviour, where
     // Fastify stringified the Date itself.
     const viaJson = JSON.parse(JSON.stringify({ d: date })) as { d: string };
     expect(isoDateTime.parse(date)).toBe(viaJson.d);
   });
 
-  it("passes an ISO string through unchanged", () => {
+  it("should pass an ISO string through unchanged", () => {
     expect(isoDateTime.parse("2026-01-15T12:00:00.000Z")).toBe("2026-01-15T12:00:00.000Z");
   });
 
-  it("rejects a bare calendar date", () => {
+  it("should reject a bare calendar date", () => {
     expect(isoDateTime.safeParse("2026-01-15").success).toBe(false);
   });
 
-  it("infers as a string, not a Date", () => {
+  it("should infer as a string, not a Date", () => {
     const parsed: string = isoDateTime.parse(date);
     expect(typeof parsed).toBe("string");
   });

@@ -21,7 +21,7 @@ const C = portfolio("c", "Gamma", false);
 const ALL = [A, B, C];
 
 describe("parsePortfolioSelection", () => {
-  it("absent param selects every portfolio", () => {
+  it("should select every portfolio when absent param", () => {
     const s = parsePortfolioSelection(undefined, ALL);
     expect(s.selectedIds).toEqual(["a", "b", "c"]);
     expect(s.allSelected).toBe(true);
@@ -29,34 +29,34 @@ describe("parsePortfolioSelection", () => {
 
   // The default portfolio decides what a new transaction is pre-assigned to,
   // not what the dashboard lands on.
-  it("absent param ignores which portfolio is the default", () => {
+  it("should ignore which portfolio is the default when absent param", () => {
     const noDefault = [A, portfolio("b", "Beta", false), C];
     const s = parsePortfolioSelection(undefined, noDefault);
     expect(s.selectedIds).toEqual(["a", "b", "c"]);
     expect(s.allSelected).toBe(true);
   });
 
-  it("an absent param and 'all' are equivalent", () => {
+  it("should treat absent param and 'all' as equivalent", () => {
     expect(parsePortfolioSelection(undefined, ALL)).toEqual(parsePortfolioSelection("all", ALL));
   });
 
-  it("an empty param behaves as absent", () => {
+  it("should behave as absent when an empty param", () => {
     expect(parsePortfolioSelection("", ALL)).toEqual(parsePortfolioSelection(undefined, ALL));
   });
 
-  it("'all' selects everything", () => {
+  it("should select everything with 'all'", () => {
     const s = parsePortfolioSelection("all", ALL);
     expect(s.selectedIds).toEqual(["a", "b", "c"]);
     expect(s.allSelected).toBe(true);
   });
 
-  it("'none' is an explicit empty selection", () => {
+  it("should be an explicit empty selection with 'none'", () => {
     const s = parsePortfolioSelection("none", ALL);
     expect(s.selected).toEqual([]);
     expect(s.allSelected).toBe(false);
   });
 
-  it("a comma list selects the subset in portfolio order", () => {
+  it("should select the subset in portfolio order from a comma list", () => {
     const s = parsePortfolioSelection("c,a", ALL);
     expect(s.selectedIds).toEqual(["a", "c"]);
     expect(s.allSelected).toBe(false);
@@ -64,22 +64,22 @@ describe("parsePortfolioSelection", () => {
 
   // allSelected is derived from the resolved selection, so a hand-typed URL
   // naming every id reports the same state as "all".
-  it("a comma list naming every portfolio counts as all selected", () => {
+  it("should count as all selected when a comma list names every portfolio", () => {
     const s = parsePortfolioSelection("c,a,b", ALL);
     expect(s.allSelected).toBe(true);
   });
 
-  it("stale ids are dropped silently", () => {
+  it("should drop stale ids silently", () => {
     const s = parsePortfolioSelection("a,deleted-id", ALL);
     expect(s.selectedIds).toEqual(["a"]);
   });
 
-  it("a list of only stale ids yields an empty selection, not the default", () => {
+  it("should yield an empty selection from a list of only stale ids, not the default", () => {
     const s = parsePortfolioSelection("deleted-id", ALL);
     expect(s.selected).toEqual([]);
   });
 
-  it("empty portfolio list yields an empty selection", () => {
+  it("should yield an empty selection when empty portfolio list", () => {
     const s = parsePortfolioSelection(undefined, []);
     expect(s.selected).toEqual([]);
   });

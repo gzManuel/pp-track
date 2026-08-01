@@ -33,7 +33,7 @@ afterEach(() => {
 });
 
 describe("getRate", () => {
-  it("requests the path for the rate it was asked for", async () => {
+  it("should request the path for the rate it was asked for", async () => {
     fetchMock.mockResolvedValue(jsonResponse(HISTORICAL));
     const { getRate } = await freshModule();
 
@@ -42,7 +42,7 @@ describe("getRate", () => {
     expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining("/cotizaciones/dolares/contadoconliqui"), expect.anything());
   });
 
-  it("takes the latest entry on or before the date, skipping non-trading days", async () => {
+  it("should take the latest entry on or before the date, skipping non-trading days", async () => {
     fetchMock.mockResolvedValue(jsonResponse(HISTORICAL));
     const { getMepRate } = await freshModule();
 
@@ -52,7 +52,7 @@ describe("getRate", () => {
     expect(rate).toBe((1444.8 + 1454) / 2);
   });
 
-  it("never returns a rate from after the requested date", async () => {
+  it("should never return a rate from after the requested date", async () => {
     fetchMock.mockResolvedValue(jsonResponse(HISTORICAL));
     const { getMepRate } = await freshModule();
 
@@ -61,7 +61,7 @@ describe("getRate", () => {
     expect(rate).toBe(1405); // the 06-01 close, not 06-02 or 06-05
   });
 
-  it("falls back to the live rate when the series has nothing on or before the date", async () => {
+  it("should fall back to the live rate when the series has nothing on or before the date", async () => {
     fetchMock
       .mockResolvedValueOnce(jsonResponse(HISTORICAL))
       .mockResolvedValueOnce(jsonResponse({ moneda: "USD", casa: "bolsa", compra: 1600, venta: 1610 }));
@@ -74,7 +74,7 @@ describe("getRate", () => {
     expect(fetchMock).toHaveBeenLastCalledWith(expect.stringContaining("dolarapi.com/v1/dolares/bolsa"), expect.anything());
   });
 
-  it("falls back to the live rate when the historical series is unreachable", async () => {
+  it("should fall back to the live rate when the historical series is unreachable", async () => {
     fetchMock
       .mockRejectedValueOnce(new Error("network down"))
       .mockResolvedValueOnce(jsonResponse({ moneda: "USD", casa: "bolsa", compra: 1600, venta: 1610 }));
@@ -83,7 +83,7 @@ describe("getRate", () => {
     expect(await getMepRate(new Date("2026-06-02T12:00:00Z"))).toBe(1605);
   });
 
-  it("caches per calendar day", async () => {
+  it("should cache per calendar day", async () => {
     fetchMock.mockResolvedValue(jsonResponse(HISTORICAL));
     const { getMepRate } = await freshModule();
 
@@ -93,7 +93,7 @@ describe("getRate", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
-  it("keys the cache by rate, so MEP and CCL cannot collide", async () => {
+  it("should key the cache by rate, so MEP and CCL cannot collide", async () => {
     fetchMock.mockImplementation(async (url: string) =>
       jsonResponse(
         url.includes("contadoconliqui")
@@ -108,7 +108,7 @@ describe("getRate", () => {
     expect(await getCclRate(at)).toBe(1565);
   });
 
-  it("dedupes concurrent lookups of the same rate and day into one fetch", async () => {
+  it("should dedupe concurrent lookups of the same rate and day into one fetch", async () => {
     fetchMock.mockResolvedValue(jsonResponse(HISTORICAL));
     const { getMepRate } = await freshModule();
     const at = new Date("2026-06-02T12:00:00Z");
@@ -119,7 +119,7 @@ describe("getRate", () => {
     expect([a, b, c]).toEqual([1449.4, 1449.4, 1449.4]);
   });
 
-  it("throws when both sources fail rather than inventing a rate", async () => {
+  it("should throw when both sources fail rather than inventing a rate", async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse([], false)).mockResolvedValueOnce(jsonResponse(null, false));
     const { getMepRate } = await freshModule();
 
@@ -128,7 +128,7 @@ describe("getRate", () => {
 });
 
 describe("getRates", () => {
-  it("returns both rates for one date", async () => {
+  it("should return both rates for one date", async () => {
     fetchMock.mockImplementation(async (url: string) =>
       jsonResponse(
         url.includes("contadoconliqui")

@@ -75,7 +75,7 @@ jobs:
         run: pnpm check-types
 
       - name: Test
-        run: pnpm test
+        run: pnpm test:coverage
 
       - name: Validate migrations
         working-directory: apps/server

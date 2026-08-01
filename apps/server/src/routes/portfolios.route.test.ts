@@ -38,20 +38,20 @@ describe("portfolio routes", () => {
       { method: "GET" as const, url: `/api/portfolios/${PORTFOLIO_ID}/holdings` },
     ];
 
-    it.each(routes)("401s $method $url without credentials", async ({ method, url }) => {
+    it.each(routes)("should return 401 $method $url without credentials", async ({ method, url }) => {
       const res = await app.inject({ method, url });
       expect(res.statusCode).toBe(401);
       expect(prisma.portfolio.findFirst).not.toHaveBeenCalled();
     });
 
-    it.each(routes)("401s $method $url with a valid secret but no user id", async ({ method, url }) => {
+    it.each(routes)("should return 401 $method $url with a valid secret but no user id", async ({ method, url }) => {
       const res = await app.inject({ method, url, headers: { "x-internal-secret": SECRET } });
       expect(res.statusCode).toBe(401);
     });
   });
 
   describe("GET /portfolios", () => {
-    it("returns only the caller's portfolios, defaults first", async () => {
+    it("should return only the caller's portfolios, defaults first", async () => {
       prisma.portfolio.findMany.mockResolvedValue([portfolioRow]);
 
       const res = await app.inject({ method: "GET", url: "/api/portfolios", headers: auth });
@@ -66,7 +66,7 @@ describe("portfolio routes", () => {
   });
 
   describe("POST /portfolios", () => {
-    it("creates the first portfolio as the default", async () => {
+    it("should create the first portfolio as the default", async () => {
       prisma.portfolio.count.mockResolvedValue(0);
       prisma.portfolio.create.mockResolvedValue(portfolioRow);
 
@@ -78,7 +78,7 @@ describe("portfolio routes", () => {
       });
     });
 
-    it("does not mark a subsequent portfolio as the default", async () => {
+    it("should not mark a subsequent portfolio as the default", async () => {
       prisma.portfolio.count.mockResolvedValue(2);
       prisma.portfolio.create.mockResolvedValue({ ...portfolioRow, isDefault: false });
 
@@ -89,7 +89,7 @@ describe("portfolio routes", () => {
       });
     });
 
-    it("400s on an empty name without touching the database", async () => {
+    it("should return 400 on an empty name without touching the database", async () => {
       const res = await app.inject({ method: "POST", url: "/api/portfolios", headers: auth, payload: { name: "" } });
 
       expect(res.statusCode).toBe(400);
@@ -99,7 +99,7 @@ describe("portfolio routes", () => {
   });
 
   describe("GET /portfolios/:id/holdings", () => {
-    it("404s when the portfolio belongs to another user", async () => {
+    it("should return 404 when the portfolio belongs to another user", async () => {
       // The ownership query is scoped by userId, so another user's row simply
       // doesn't match.
       prisma.portfolio.findFirst.mockResolvedValue(null);
@@ -114,7 +114,7 @@ describe("portfolio routes", () => {
       expect(prisma.holding.findMany).not.toHaveBeenCalled();
     });
 
-    it("serializes Decimal columns as strings", async () => {
+    it("should serialize Decimal columns as strings", async () => {
       prisma.portfolio.findFirst.mockResolvedValue(portfolioRow);
       prisma.holding.findMany.mockResolvedValue([
         {
@@ -143,7 +143,7 @@ describe("portfolio routes", () => {
       expect(holding?.avgCostBasisCcl).toBe("171.875");
     });
 
-    it("400s on a non-UUID portfolio id", async () => {
+    it("should return 400 on a non-UUID portfolio id", async () => {
       const res = await app.inject({ method: "GET", url: "/api/portfolios/not-a-uuid/holdings", headers: auth });
 
       expect(res.statusCode).toBe(400);
@@ -152,7 +152,7 @@ describe("portfolio routes", () => {
   });
 
   describe("cross-user isolation", () => {
-    it("scopes every ownership lookup to the calling user", async () => {
+    it("should scope every ownership lookup to the calling user", async () => {
       prisma.portfolio.findFirst.mockResolvedValue(null);
 
       await app.inject({

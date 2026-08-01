@@ -63,13 +63,13 @@ describe("transaction routes", () => {
       { method: "DELETE" as const, url: `/api/portfolios/${PORTFOLIO_ID}/transactions/${TX_ID}` },
     ];
 
-    it.each(routes)("401s $method $url without credentials", async ({ method, url }) => {
+    it.each(routes)("should return 401 $method $url without credentials", async ({ method, url }) => {
       const res = await app.inject({ method, url });
       expect(res.statusCode).toBe(401);
       expect(prisma.portfolio.findFirst).not.toHaveBeenCalled();
     });
 
-    it.each(routes)("401s $method $url with a valid secret but no user id", async ({ method, url }) => {
+    it.each(routes)("should return 401 $method $url with a valid secret but no user id", async ({ method, url }) => {
       const res = await app.inject({ method, url, headers: { "x-internal-secret": SECRET } });
       expect(res.statusCode).toBe(401);
     });
@@ -80,7 +80,7 @@ describe("transaction routes", () => {
       prisma.portfolio.findFirst.mockResolvedValue(portfolioRow);
     });
 
-    it("returns a null cursor when the page is not full", async () => {
+    it("should return a null cursor when the page is not full", async () => {
       prisma.transaction.findMany.mockResolvedValue([transactionRow()]);
 
       const res = await app.inject({
@@ -94,7 +94,7 @@ describe("transaction routes", () => {
       expect(res.json<TransactionPageBody>().items).toHaveLength(1);
     });
 
-    it("trims the lookahead row and returns its predecessor as the cursor", async () => {
+    it("should trim the lookahead row and return its predecessor as the cursor", async () => {
       const first = transactionRow({ id: TX_ID });
       const second = transactionRow({ id: "aa1b2c3d-4e5f-4061-8273-849a5b6c7d8e" });
       const lookahead = transactionRow({ id: "bb2c3d4e-5f60-4172-9384-95ab6c7d8e9f" });
@@ -113,7 +113,7 @@ describe("transaction routes", () => {
       expect(prisma.transaction.findMany).toHaveBeenCalledWith(expect.objectContaining({ take: 3 }));
     });
 
-    it("skips the cursor row itself when paging", async () => {
+    it("should skip the cursor row itself when paging", async () => {
       prisma.transaction.findMany.mockResolvedValue([]);
 
       await app.inject({
@@ -125,7 +125,7 @@ describe("transaction routes", () => {
       expect(prisma.transaction.findMany).toHaveBeenCalledWith(expect.objectContaining({ cursor: { id: TX_ID }, skip: 1 }));
     });
 
-    it("400s on a take above the cap", async () => {
+    it("should return 400 on a take above the cap", async () => {
       const res = await app.inject({
         method: "GET",
         url: `/api/portfolios/${PORTFOLIO_ID}/transactions?take=5000`,
@@ -138,7 +138,7 @@ describe("transaction routes", () => {
   });
 
   describe("POST /portfolios/:id/transactions", () => {
-    it("404s before doing any asset resolution when the portfolio isn't the caller's", async () => {
+    it("should return 404 before doing any asset resolution when the portfolio is not the caller's", async () => {
       prisma.portfolio.findFirst.mockResolvedValue(null);
 
       const res = await app.inject({
@@ -153,7 +153,7 @@ describe("transaction routes", () => {
       expect(prisma.transaction.create).not.toHaveBeenCalled();
     });
 
-    it("creates the transaction and rebuilds the holding", async () => {
+    it("should create the transaction and rebuild the holding", async () => {
       prisma.portfolio.findFirst.mockResolvedValue(portfolioRow);
       prisma.asset.findFirst.mockResolvedValue(assetRow);
       prisma.transaction.create.mockResolvedValue(transactionRow());
@@ -188,7 +188,7 @@ describe("transaction routes", () => {
         prisma.holding.create.mockResolvedValue({});
       });
 
-      it("stores a peso purchase in ARS at the price entered", async () => {
+      it("should store a peso purchase in ARS at the price entered", async () => {
         prisma.transaction.create.mockResolvedValue(transactionRow({ currency: "ARS", price: dec("1909.62") }));
 
         const res = await app.inject({
@@ -211,7 +211,7 @@ describe("transaction routes", () => {
         ["the peso ticker", "SPY.BA"],
         ["the MEP D-variant", "SPYD.BA"],
         ["the CCL C-variant", "SPYC.BA"],
-      ])("resolves %s onto the single SPY.BA asset", async (_label, ticker) => {
+      ])("should resolve %s onto the single SPY.BA asset", async (_label, ticker) => {
         prisma.transaction.create.mockResolvedValue(transactionRow());
 
         const res = await app.inject({
@@ -226,7 +226,7 @@ describe("transaction routes", () => {
         expect(prisma.asset.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: { ticker: "SPY.BA" } }));
       });
 
-      it("stores a CCL purchase as CCL rather than folding it into MEP", async () => {
+      it("should store a CCL purchase as CCL rather than folding it into MEP", async () => {
         prisma.transaction.create.mockResolvedValue(transactionRow({ currency: "CCL" }));
 
         const res = await app.inject({
@@ -242,7 +242,7 @@ describe("transaction routes", () => {
         expect(written.data.price).toBe(1.29);
       });
 
-      it("rejects a currency outside the contract", async () => {
+      it("should reject a currency outside the contract", async () => {
         const res = await app.inject({
           method: "POST",
           url: `/api/portfolios/${PORTFOLIO_ID}/transactions`,
@@ -255,7 +255,7 @@ describe("transaction routes", () => {
       });
     });
 
-    it("lowercases types are normalized before reaching the database", async () => {
+    it("should normalize lowercases types before reaching the database", async () => {
       prisma.portfolio.findFirst.mockResolvedValue(portfolioRow);
       prisma.asset.findFirst.mockResolvedValue(assetRow);
       prisma.transaction.create.mockResolvedValue(transactionRow({ type: "DIVIDEND" }));
@@ -271,7 +271,7 @@ describe("transaction routes", () => {
       expect(createArgs.data.type).toBe("DIVIDEND");
     });
 
-    it("leaves the holding untouched for a DIVIDEND", async () => {
+    it("should leave the holding untouched for a DIVIDEND", async () => {
       prisma.portfolio.findFirst.mockResolvedValue(portfolioRow);
       prisma.asset.findFirst.mockResolvedValue(assetRow);
       prisma.transaction.create.mockResolvedValue(transactionRow({ type: "DIVIDEND" }));
@@ -287,7 +287,7 @@ describe("transaction routes", () => {
       expect(prisma.holding.update).not.toHaveBeenCalled();
     });
 
-    it("422s when a SELL exceeds the position held at that date", async () => {
+    it("should return 422 when a SELL exceeds the position held at that date", async () => {
       prisma.portfolio.findFirst.mockResolvedValue(portfolioRow);
       prisma.asset.findFirst.mockResolvedValue(assetRow);
       const sell = transactionRow({ type: "SELL", quantity: dec("999") });
@@ -307,7 +307,7 @@ describe("transaction routes", () => {
       expect(res.json<ErrorBody>()).toEqual({ error: "Cannot sell more than the quantity held at that date" });
     });
 
-    it("400s on a negative quantity", async () => {
+    it("should return 400 on a negative quantity", async () => {
       prisma.portfolio.findFirst.mockResolvedValue(portfolioRow);
 
       const res = await app.inject({
@@ -323,7 +323,7 @@ describe("transaction routes", () => {
   });
 
   describe("PATCH /portfolios/:id/transactions/:txId", () => {
-    it("404s when the transaction isn't in the given portfolio", async () => {
+    it("should return 404 when the transaction is not in the given portfolio", async () => {
       prisma.portfolio.findFirst.mockResolvedValue(portfolioRow);
       prisma.transaction.findFirst.mockResolvedValue(null);
 
@@ -341,7 +341,7 @@ describe("transaction routes", () => {
       });
     });
 
-    it("404s with a distinct message when the move target isn't the caller's", async () => {
+    it("should return 404 with a distinct message when the move target is not the caller's", async () => {
       // Call order: the owning portfolio resolves, then the move target doesn't.
       prisma.portfolio.findFirst.mockResolvedValueOnce(portfolioRow).mockResolvedValueOnce(null);
       prisma.transaction.findFirst.mockResolvedValue(transactionRow());
@@ -360,7 +360,7 @@ describe("transaction routes", () => {
   });
 
   describe("DELETE /portfolios/:id/transactions/:txId", () => {
-    it("deletes and returns 204", async () => {
+    it("should delete and return 204", async () => {
       prisma.portfolio.findFirst.mockResolvedValue(portfolioRow);
       prisma.transaction.findFirst.mockResolvedValue(transactionRow());
       prisma.transaction.findMany.mockResolvedValue([]);
@@ -376,7 +376,7 @@ describe("transaction routes", () => {
       expect(prisma.transaction.delete).toHaveBeenCalledWith({ where: { id: TX_ID } });
     });
 
-    it("404s without deleting when the portfolio isn't the caller's", async () => {
+    it("should return 404 without deleting when the portfolio is not the caller's", async () => {
       prisma.portfolio.findFirst.mockResolvedValue(null);
 
       const res = await app.inject({

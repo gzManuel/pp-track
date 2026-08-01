@@ -11,31 +11,31 @@ const base = {
 };
 
 describe("createTransactionBody", () => {
-  it("anchors a bare YYYY-MM-DD at noon UTC so the calendar day never shifts", () => {
+  it("should anchor a bare YYYY-MM-DD at noon UTC so the calendar day never shifts", () => {
     const parsed = createTransactionBody.parse(base);
     expect(parsed.transactedAt.toISOString()).toBe("2026-07-22T12:00:00.000Z");
   });
 
-  it("passes full ISO timestamps through date coercion untouched", () => {
+  it("should pass full ISO timestamps through date coercion untouched", () => {
     const parsed = createTransactionBody.parse({ ...base, transactedAt: "2026-07-22T03:30:00.000Z" });
     expect(parsed.transactedAt.toISOString()).toBe("2026-07-22T03:30:00.000Z");
   });
 
-  it("normalizes lowercase transaction types", () => {
+  it("should normalize lowercase transaction types", () => {
     const parsed = createTransactionBody.parse({ ...base, type: "sell" });
     expect(parsed.type).toBe("SELL");
   });
 
-  it("rejects unknown transaction types", () => {
+  it("should reject unknown transaction types", () => {
     expect(() => createTransactionBody.parse({ ...base, type: "SHORT" })).toThrow();
   });
 
-  it("rejects non-positive quantities", () => {
+  it("should reject non-positive quantities", () => {
     expect(() => createTransactionBody.parse({ ...base, quantity: 0 })).toThrow();
     expect(() => createTransactionBody.parse({ ...base, quantity: -1 })).toThrow();
   });
 
-  it("rejects malformed dates", () => {
+  it("should reject malformed dates", () => {
     expect(() => createTransactionBody.parse({ ...base, transactedAt: "22/07/2026" })).toThrow();
   });
 });

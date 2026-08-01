@@ -30,27 +30,27 @@ describe("auth plugin", () => {
   }
 
   describe("verifyInternalSecret", () => {
-    it("401s with no secret header", async () => {
+    it("should return 401 with no secret header", async () => {
       const res = await inject("/secret-only", {});
       expect(res.statusCode).toBe(401);
     });
 
-    it("401s with a wrong secret of the same length", async () => {
+    it("should return 401 with a wrong secret of the same length", async () => {
       const res = await inject("/secret-only", { "x-internal-secret": "x".repeat(SECRET.length) });
       expect(res.statusCode).toBe(401);
     });
 
-    it("401s with a wrong-length secret (timingSafeEqual guard)", async () => {
+    it("should return 401 with a wrong-length secret (timingSafeEqual guard)", async () => {
       const res = await inject("/secret-only", { "x-internal-secret": "short" });
       expect(res.statusCode).toBe(401);
     });
 
-    it("401s with an empty secret even though the env var is set", async () => {
+    it("should return 401 with an empty secret even though the env var is set", async () => {
       const res = await inject("/secret-only", { "x-internal-secret": "" });
       expect(res.statusCode).toBe(401);
     });
 
-    it("passes with the correct secret", async () => {
+    it("should pass with the correct secret", async () => {
       const res = await inject("/secret-only", { "x-internal-secret": SECRET });
       expect(res.statusCode).toBe(200);
       expect(res.json()).toEqual({ ok: true });
@@ -58,22 +58,22 @@ describe("auth plugin", () => {
   });
 
   describe("authenticate", () => {
-    it("401s with a valid secret but no user id", async () => {
+    it("should return 401 with a valid secret but no user id", async () => {
       const res = await inject("/user-scoped", { "x-internal-secret": SECRET });
       expect(res.statusCode).toBe(401);
     });
 
-    it("401s with a malformed (non-UUID) user id", async () => {
+    it("should return 401 with a malformed (non-UUID) user id", async () => {
       const res = await inject("/user-scoped", { "x-internal-secret": SECRET, "x-user-id": "not-a-uuid" });
       expect(res.statusCode).toBe(401);
     });
 
-    it("401s with a valid user id but wrong secret", async () => {
+    it("should return 401 with a valid user id but wrong secret", async () => {
       const res = await inject("/user-scoped", { "x-internal-secret": "nope", "x-user-id": VALID_USER_ID });
       expect(res.statusCode).toBe(401);
     });
 
-    it("populates request.userId on success", async () => {
+    it("should populate request.userId on success", async () => {
       const res = await inject("/user-scoped", { "x-internal-secret": SECRET, "x-user-id": VALID_USER_ID });
       expect(res.statusCode).toBe(200);
       expect(res.json()).toEqual({ userId: VALID_USER_ID });

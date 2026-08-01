@@ -2,12 +2,17 @@ import { fileURLToPath } from "url";
 import path from "path";
 import tseslint from "typescript-eslint";
 import { nextJsConfig } from "@repo/eslint-config/next-js";
+import { config as testConfig } from "@repo/eslint-config/test";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 /** @type {import("eslint").Linter.Config[]} */
 export default tseslint.config(
   ...nextJsConfig,
+  ...testConfig,
+  {
+    ignores: ["coverage/**", ".next/**"],
+  },
   {
     // Anchor the TS project root for EVERY file this config lints — not just the
     // type-checked globs below, but also this config file, next.config, etc.
@@ -37,5 +42,13 @@ export default tseslint.config(
     // Exempt them from type-aware rules; they still get the base + React rules.
     files: ["components/shadcn/**/*.{ts,tsx}"],
     extends: [tseslint.configs.disableTypeChecked],
+  },
+  {
+    // Test-specific rule overrides.
+    files: ["lib/**/*.test.ts"],
+    rules: {
+      // Non-null assertions are necessary when accessing mock.calls arrays in tests.
+      "@typescript-eslint/no-non-null-assertion": "off",
+    },
   },
 );

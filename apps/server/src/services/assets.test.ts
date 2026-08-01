@@ -29,7 +29,7 @@ describe("toArsTicker / toUsdTicker", () => {
     ["SPYD.BA", "SPY.BA"],
     ["SPYC.BA", "SPY.BA"],
     ["AAPL", "AAPL"],
-  ])("toArsTicker(%s) = %s", (input, expected) => {
+  ])("should convert toArsTicker(%s) to %s", (input, expected) => {
     expect(toArsTicker(input)).toBe(expected);
   });
 
@@ -38,58 +38,58 @@ describe("toArsTicker / toUsdTicker", () => {
     ["SPYC.BA", "SPYD.BA"],
     ["SPYD.BA", "SPYD.BA"],
     ["AAPL", "AAPL"],
-  ])("toUsdTicker(%s) = %s", (input, expected) => {
+  ])("should convert toUsdTicker(%s) to %s", (input, expected) => {
     expect(toUsdTicker(input)).toBe(expected);
   });
 });
 
 describe("resolveCanonicalTicker", () => {
-  it("leaves a ticker with no variant suffix alone without any lookup", async () => {
+  it("should leave a ticker with no variant suffix alone without any lookup", async () => {
     const client = clientWith([]);
     expect(await resolveCanonicalTicker(client, "AAPL")).toBe("AAPL");
     expect(fetchQuote).not.toHaveBeenCalled();
   });
 
-  it("joins a D-variant onto the peso asset already registered", async () => {
+  it("should join a D-variant onto the peso asset already registered", async () => {
     const client = clientWith(["SPY.BA"]);
     expect(await resolveCanonicalTicker(client, "SPYD.BA")).toBe("SPY.BA");
     expect(fetchQuote).not.toHaveBeenCalled(); // resolved from the DB alone
   });
 
-  it("joins a C-variant onto the same peso asset", async () => {
+  it("should join a C-variant onto the same peso asset", async () => {
     const client = clientWith(["SPY.BA"]);
     expect(await resolveCanonicalTicker(client, "SPYC.BA")).toBe("SPY.BA");
   });
 
-  it("adopts the peso form on first sight when it really is a peso BYMA symbol", async () => {
+  it("should adopt the peso form on first sight when it really is a peso BYMA symbol", async () => {
     fetchQuote.mockResolvedValue({ symbol: "SPY.BA", currency: "ARS", price: 1, name: "SPDR", quoteType: "ETF", exchange: "BUE" });
     expect(await resolveCanonicalTicker(clientWith([]), "SPYD.BA")).toBe("SPY.BA");
   });
 
   // The GLD case: a base symbol that itself ends in D. Stripping it yields the
   // bogus GL.BA, which would split the gold CEDEAR across two asset rows.
-  it("keeps GLD.BA intact when it is the registered asset", async () => {
+  it("should keep GLD.BA intact when it is the registered asset", async () => {
     const client = clientWith(["GLD.BA"]);
     expect(await resolveCanonicalTicker(client, "GLD.BA")).toBe("GLD.BA");
   });
 
-  it("keeps GLD.BA intact on first sight, since GL.BA is not a real symbol", async () => {
+  it("should keep GLD.BA intact on first sight, since GL.BA is not a real symbol", async () => {
     fetchQuote.mockRejectedValue(new Error("Symbol not found: GL.BA"));
     expect(await resolveCanonicalTicker(clientWith([]), "GLD.BA")).toBe("GLD.BA");
   });
 
-  it("still merges GLDD.BA into GLD.BA", async () => {
+  it("should still merge GLDD.BA into GLD.BA", async () => {
     const client = clientWith(["GLD.BA"]);
     expect(await resolveCanonicalTicker(client, "GLDD.BA")).toBe("GLD.BA");
   });
 
-  it("does not adopt a stripped form that is quoted in dollars", async () => {
+  it("should not adopt a stripped form that is quoted in dollars", async () => {
     // A dollar quote means the stripped symbol is not the peso ticker.
     fetchQuote.mockResolvedValue({ symbol: "GL.BA", currency: "USD", price: 1, name: "?", quoteType: "EQUITY", exchange: "BUE" });
     expect(await resolveCanonicalTicker(clientWith([]), "GLD.BA")).toBe("GLD.BA");
   });
 
-  it("keeps the entered ticker when upstream is unreachable", async () => {
+  it("should keep the entered ticker when upstream is unreachable", async () => {
     fetchQuote.mockRejectedValue(new Error("network down"));
     expect(await resolveCanonicalTicker(clientWith([]), "SPYD.BA")).toBe("SPYD.BA");
   });
