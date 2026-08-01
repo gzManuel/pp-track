@@ -30,7 +30,7 @@
     "@repo/eslint-config": "workspace:*",
     "@repo/typescript-config": "workspace:*",
     "@vitest/coverage-v8": "^4.1.10",
-    "eslint": "^9.39.1",
+    "eslint": "^10.8.0",
     "typescript": "5.9.2",
     "typescript-eslint": "^8.50.0",
     "vitest": "^4.1.10"
