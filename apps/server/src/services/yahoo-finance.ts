@@ -46,11 +46,54 @@ export function hasVariantSuffix(ticker: string): boolean {
  * The MEP-dollar `D` variant of a peso CEDEAR ticker, `SPY.BA` -> `SPYD.BA`.
  * Non-BYMA tickers pass through; a `C` variant is rewritten to `D`, since this
  * exists to pick the symbol to request a USD quote for.
+ *
+ * ⚠️ This is a syntactic construct and may fail for CEDEARs whose D-variant base
+ * spelling differs from their ARS base spelling (e.g. `GOOGL.BA` → `GOOGLD.BA`
+ * doesn't exist; the real MEP variant is `GOGLD.BA`). The returned symbol should
+ * be validated against a live quote before trusting it as canonical.
  */
 export function toUsdTicker(ticker: string): string {
   const ars = toArsTicker(ticker);
   if (!/\.BA$/i.test(ars)) return ticker;
   return ars.replace(/\.BA$/i, "D.BA");
+}
+
+/**
+ * Resolve a MEP/USD CEDEAR variant by first trying the regex-derived symbol,
+ * then falling back to a symbol search if the derived symbol doesn't validate.
+ *
+ * Used when `quoteSymbolFor` needs a USD ticker for a CEDEAR but the regex may
+ * produce an incorrect/non-existent symbol (e.g. `GOOGL.BA` → regex `GOOGLD.BA`
+ * doesn't exist, but search finds the real `GOGLD.BA`).
+ *
+ * Returns the symbol string on success; throws if no valid variant is found.
+ */
+export async function resolveUsdVariant(assetName: string, regexDerived: string): Promise<string> {
+  // Try the regex-derived symbol first (cheap, no network, correct for most CEDEARs).
+  try {
+    const quote = await fetchQuote(regexDerived);
+    if (quote.currency.toUpperCase() === "USD") return regexDerived;
+  } catch {
+    // Symbol not found or no price; try search fallback.
+  }
+
+  // Fallback: search for variants by asset name + "CEDEAR" to surface BYMA variants,
+  // then filter to D-suffix and BUE exchange.
+  const searchQuery = `${assetName} CEDEAR`;
+  const result = (await yf.search(searchQuery, { newsCount: 0 }, { validateResult: false, ...fetchTimeout() })) as {
+    quotes?: Record<string, unknown>[];
+  };
+
+  const candidates = (result.quotes ?? [])
+    .filter((q) => String(q.symbol).endsWith("D.BA") && q.exchange === "BUE" && String(q.shortname).toUpperCase().includes("CEDEAR"))
+    .map((q) => String(q.symbol));
+
+  if (candidates.length === 0) {
+    throw new Error(`No MEP variant found for asset "${assetName}" (tried regex "${regexDerived}" and symbol search)`);
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- guarded by length check above
+  return candidates[0]!;
 }
 
 export interface SymbolSearchResult {

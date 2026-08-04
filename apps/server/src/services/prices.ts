@@ -1,6 +1,6 @@
 import { Prisma, type PrismaClient } from "@prisma/client";
 import type { Currency } from "@repo/api-contract";
-import { fetchQuote, toArsTicker, toUsdTicker } from "./yahoo-finance.js";
+import { fetchQuote, toArsTicker, toUsdTicker, resolveUsdVariant } from "./yahoo-finance.js";
 import { assetSeedFromQuote, createAssetOrRecover } from "./assets.js";
 
 const CACHE_TTL_MS = 15 * 60 * 1000;
@@ -29,6 +29,10 @@ export interface Rates {
  * (`SPYD.BA`) ones are quoted directly by the market, so we ask for those rather
  * than deriving them. There is no reliable `C` quote, so the CCL view is derived
  * from the peso price — which is why CCL asks for the ARS symbol here.
+ *
+ * For MEP, the regex-derived symbol is returned without validation here; validation
+ * happens on first fetch in `getPrice` → `fetchAndCache`. For ARS/CCL, the returned
+ * symbol is validated synchronously in `fetchAndCache` against the quote's currency.
  */
 export function quoteSymbolFor(ticker: string, currency: Currency): string {
   return currency === "MEP" ? toUsdTicker(ticker) : toArsTicker(ticker);
@@ -92,9 +96,24 @@ export async function getPrice(prisma: PrismaClient, requestedTicker: string, cu
   });
 
   const cached = asset?.priceSnapshots[0];
-  const raw = cached
-    ? { price: cached.price, currency: cached.currency, recordedAt: cached.recordedAt, cached: true }
-    : await fetchAndCache(prisma, fetchSymbol, asset);
+  let raw: { price: Prisma.Decimal; currency: string; recordedAt: Date; cached: boolean };
+
+  if (cached) {
+    raw = { price: cached.price, currency: cached.currency, recordedAt: cached.recordedAt, cached: true };
+  } else {
+    // If no cached asset exists and MEP lookup is happening, the symbol *may* need
+    // resolution via search fallback. Look up the canonical asset by requested ticker to
+    // get its name for search, and pass it to fetchAndCache for resolution.
+    let canonicalAsset: { id: string; name: string } | null = asset;
+    if (!canonicalAsset && currency === "MEP") {
+      canonicalAsset = await prisma.asset.findFirst({
+        where: { ticker: requestedTicker },
+        orderBy: { updatedAt: "desc" },
+      });
+    }
+
+    raw = await fetchAndCache(prisma, fetchSymbol, asset, requestedTicker, currency, canonicalAsset);
+  }
 
   const converted = convertQuote(raw.price, raw.currency, currency, rates);
 
@@ -108,8 +127,40 @@ export async function getPrice(prisma: PrismaClient, requestedTicker: string, cu
 }
 
 /** Fetch a fresh quote, register the asset if new, and store the snapshot. */
-async function fetchAndCache(prisma: PrismaClient, fetchSymbol: string, asset: { id: string; name: string } | null) {
-  const quote = await fetchQuote(fetchSymbol);
+async function fetchAndCache(
+  prisma: PrismaClient,
+  fetchSymbol: string,
+  asset: { id: string; name: string } | null,
+  requestedTicker: string,
+  currency: Currency,
+  canonicalAsset: { id: string; name: string } | null = null,
+) {
+  let quote: Awaited<ReturnType<typeof fetchQuote>>;
+
+  try {
+    quote = await fetchQuote(fetchSymbol);
+  } catch (error) {
+    // If the regex-derived MEP symbol didn't resolve, try the search-based fallback.
+    // Use the canonical asset's name to search for the correct D/C variant.
+    if (currency === "MEP" && asset === null && canonicalAsset?.name) {
+      try {
+        const resolvedSymbol = await resolveUsdVariant(canonicalAsset.name, fetchSymbol);
+        quote = await fetchQuote(resolvedSymbol);
+        fetchSymbol = resolvedSymbol;
+      } catch {
+        throw error;
+      }
+    } else {
+      throw error;
+    }
+  }
+
+  // Validate currency for ARS/CCL: quotes must be ARS-denominated for these views.
+  // This prevents mispriced assets (e.g. a fuzzy-matched unrelated ticker) from being
+  // silently cached. See the GLD.BA/GOGL.BA scenario in the docs.
+  if ((currency === "ARS" || currency === "CCL") && quote.currency.toUpperCase() !== "ARS") {
+    throw new Error(`Currency mismatch for ${fetchSymbol}: expected ARS-quoted for ${currency} view, got ${quote.currency}`);
+  }
 
   let assetId: string;
   if (!asset) {

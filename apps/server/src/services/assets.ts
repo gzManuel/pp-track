@@ -100,7 +100,11 @@ export async function resolveCanonicalTicker(client: AssetClient, ticker: string
   const stripped = toArsTicker(ticker);
 
   const [existingStripped, existingRaw] = await Promise.all([findAssetByTicker(client, stripped), findAssetByTicker(client, ticker)]);
-  if (existingStripped) return stripped;
+
+  // Only trust a previously-created stripped asset if it's actually ARS-quoted.
+  // This prevents adopting a poisoned asset (e.g. one cached with USD currency from
+  // a fuzzy-matched quote) as canonical for a new transaction.
+  if (existingStripped && existingStripped.currency.toUpperCase() === "ARS") return stripped;
   if (existingRaw) return ticker;
 
   try {

@@ -132,7 +132,7 @@ describe("prices", () => {
         exchange: "NASDAQ",
       });
 
-      const result = await getPrice(mockPrisma as unknown as PrismaClient, "AAPL", "ARS", rates);
+      const result = await getPrice(mockPrisma as unknown as PrismaClient, "AAPL", "MEP", rates);
 
       expect(result.cached).toBe(false);
       expect(result.ticker).toBe("AAPL");
@@ -176,7 +176,7 @@ describe("prices", () => {
       });
 
       // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-explicit-any -- partial mock requires any cast
-      await getPrice(mockPrisma as any, "NEWCOIN", "ARS", rates);
+      await getPrice(mockPrisma as any, "NEWCOIN", "MEP", rates);
 
       expect(mockCreateAssetOrRecover).toHaveBeenCalled();
       expect(mockPrisma.priceSnapshot.create).toHaveBeenCalled();
@@ -217,7 +217,7 @@ describe("prices", () => {
       });
 
       // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-explicit-any -- partial mock requires any cast
-      await getPrice(mockPrisma as any, "AAPL", "ARS", rates);
+      await getPrice(mockPrisma as any, "AAPL", "MEP", rates);
 
       expect(mockPrisma.asset.update).toHaveBeenCalledWith({
         where: { id: "asset-1" },
@@ -256,7 +256,7 @@ describe("prices", () => {
       });
 
       // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-explicit-any -- partial mock requires any cast
-      await getPrice(mockPrisma as any, "AAPL", "ARS", rates);
+      await getPrice(mockPrisma as any, "AAPL", "MEP", rates);
 
       expect(mockPrisma.asset.update).not.toHaveBeenCalled();
     });
@@ -291,7 +291,7 @@ describe("prices", () => {
       });
 
       // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-explicit-any -- partial mock requires any cast
-      await getPrice(mockPrisma as any, "AAPL", "ARS", rates);
+      await getPrice(mockPrisma as any, "AAPL", "MEP", rates);
 
       expect(mockPrisma.priceSnapshot.deleteMany).toHaveBeenCalledWith({
         where: {
@@ -352,6 +352,87 @@ describe("prices", () => {
       expect(result.currency).toBe("USD");
       // 1000 ARS / 950 cclRate = ~1.05 USD
       expect(parseFloat(result.price)).toBeCloseTo(1.052631578947, 5);
+    });
+
+    it("should reject a quote with mismatched currency for ARS/CCL view", async () => {
+      const mockPrisma = {
+        asset: {
+          findFirst: vi.fn().mockResolvedValue(null),
+        },
+        priceSnapshot: {
+          create: vi.fn(),
+          deleteMany: vi.fn(),
+        },
+      };
+
+      vi.spyOn(yahooFinance, "fetchQuote").mockResolvedValue({
+        symbol: "GOGL.BA",
+        price: 6.27,
+        currency: "USD", // Wrong currency for ARS view: expected ARS
+        name: "Golden Ocean Group",
+        quoteType: "EQUITY",
+        exchange: "BUE",
+      });
+
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-explicit-any -- partial mock requires any cast
+      await expect(getPrice(mockPrisma as any, "GOGL.BA", "ARS", rates)).rejects.toThrow(/Currency mismatch.*expected ARS-quoted/);
+
+      expect(mockPrisma.priceSnapshot.create).not.toHaveBeenCalled();
+    });
+
+    it("should accept USD-quoted price for MEP view even if symbol is not found first try", async () => {
+      const mockPrisma = {
+        asset: {
+          findFirst: vi.fn(({ where }: { where: { ticker: string } }) => {
+            // First call: look up GOOGLD.BA (derived) → not found
+            // Second call: look up GOOGL.BA (canonical) → found with name
+            if (where.ticker === "GOOGLD.BA") return Promise.resolve(null);
+            if (where.ticker === "GOOGL.BA") {
+              return Promise.resolve({ id: "canonical-googl", name: "Alphabet Inc.", ticker: "GOOGL.BA" });
+            }
+            return Promise.resolve(null);
+          }),
+          update: vi.fn(),
+        },
+        priceSnapshot: {
+          create: vi.fn().mockResolvedValue({
+            price: dec("6.68"),
+            currency: "USD",
+            recordedAt: new Date("2024-01-01T12:00:00Z"),
+          }),
+          deleteMany: vi.fn(),
+        },
+      };
+
+      // First call (regex-derived GOOGLD.BA) fails; second call (after resolution) succeeds.
+      let callCount = 0;
+      vi.spyOn(yahooFinance, "fetchQuote").mockImplementation(async (symbol: string) => {
+        callCount++;
+        if (callCount === 1 && symbol === "GOOGLD.BA") {
+          throw new Error("Symbol not found: GOOGLD.BA");
+        }
+        if (symbol === "GOGLD.BA") {
+          return {
+            symbol: "GOGLD.BA",
+            price: 6.68,
+            currency: "USD",
+            name: "Alphabet Inc.",
+            quoteType: "EQUITY",
+            exchange: "BUE",
+          };
+        }
+        throw new Error(`Unexpected symbol: ${symbol}`);
+      });
+
+      vi.spyOn(yahooFinance, "resolveUsdVariant").mockResolvedValue("GOGLD.BA");
+
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-explicit-any -- partial mock requires any cast
+      const result = await getPrice(mockPrisma as any, "GOOGL.BA", "MEP", rates);
+
+      expect(result.ticker).toBe("GOOGL.BA");
+      expect(result.currency).toBe("USD");
+      expect(result.price).toBe("6.68");
+      expect(mockPrisma.priceSnapshot.create).toHaveBeenCalled();
     });
   });
 });

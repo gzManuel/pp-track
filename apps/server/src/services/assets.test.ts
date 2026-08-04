@@ -9,11 +9,13 @@ vi.mock("./yahoo-finance.js", async (importOriginal) => ({
 }));
 
 /** Minimal asset client backed by a list of registered tickers. */
-function clientWith(tickers: string[]): AssetClient {
+function clientWith(tickers: string[], defaultCurrency = "ARS"): AssetClient {
   return {
     asset: {
       findFirst: vi.fn(({ where }: { where: { ticker: string } }) =>
-        Promise.resolve(tickers.includes(where.ticker) ? { id: `id-${where.ticker}`, ticker: where.ticker } : null),
+        Promise.resolve(
+          tickers.includes(where.ticker) ? { id: `id-${where.ticker}`, ticker: where.ticker, currency: defaultCurrency } : null,
+        ),
       ),
     },
   } as unknown as AssetClient;
@@ -92,5 +94,28 @@ describe("resolveCanonicalTicker", () => {
   it("should keep the entered ticker when upstream is unreachable", async () => {
     fetchQuote.mockRejectedValue(new Error("network down"));
     expect(await resolveCanonicalTicker(clientWith([]), "SPYD.BA")).toBe("SPYD.BA");
+  });
+
+  it("should not adopt an existingStripped asset if its stored currency is not ARS (poisoned asset guard)", async () => {
+    // This asset exists but was cached with USD currency (e.g., from a fuzzy-matched quote).
+    // It should not be adopted as canonical; the system should try the alternative.
+    const client = {
+      asset: {
+        findFirst: vi.fn(({ where }: { where: { ticker: string } }) => {
+          if (where.ticker === "SPY.BA") {
+            return Promise.resolve({ id: "poisoned-spy", ticker: "SPY.BA", currency: "USD" });
+          }
+          return Promise.resolve(null);
+        }),
+      },
+    } as unknown as AssetClient;
+
+    fetchQuote.mockResolvedValue({ symbol: "SPY.BA", currency: "ARS", price: 1, name: "SPY", quoteType: "ETF", exchange: "BUE" });
+
+    const result = await resolveCanonicalTicker(client, "SPYD.BA");
+
+    // Should have tried the upstream quote and adopted the peso form, not the poisoned asset.
+    expect(result).toBe("SPY.BA");
+    expect(fetchQuote).toHaveBeenCalledWith("SPY.BA");
   });
 });

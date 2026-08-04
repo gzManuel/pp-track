@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
-import { toArsTicker, toUsdTicker } from "./yahoo-finance.js";
+import { describe, expect, it, vi, beforeEach } from "vitest";
+import { toArsTicker, toUsdTicker, resolveUsdVariant } from "./yahoo-finance.js";
+import * as yahooFinance from "./yahoo-finance.js";
 
 describe("toArsTicker", () => {
   it("should strip the D from a USD CEDEAR variant", () => {
@@ -36,4 +37,27 @@ describe("toUsdTicker", () => {
   it("should round-trip with toArsTicker", () => {
     expect(toArsTicker(toUsdTicker("GGAL.BA"))).toBe("GGAL.BA");
   });
+});
+
+describe("resolveUsdVariant", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("should return the regex-derived symbol when it validates (USD-quoted)", async () => {
+    vi.spyOn(yahooFinance, "fetchQuote").mockResolvedValue({
+      symbol: "SPYD.BA",
+      price: 6.5,
+      currency: "USD",
+      name: "SPY CEDEAR",
+      quoteType: "EQUITY",
+      exchange: "BUE",
+    });
+
+    const result = await resolveUsdVariant("SPY CEDEAR", "SPYD.BA");
+    expect(result).toBe("SPYD.BA");
+  });
+
+  // Full coverage of search fallback is in prices.test.ts integration tests.
+  // The yf.search call is internal and difficult to mock without exporting yf.
 });
