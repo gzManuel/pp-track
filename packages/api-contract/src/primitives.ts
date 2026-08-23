@@ -31,9 +31,10 @@ function isDecimalLike(value: unknown): value is { toString: () => string } {
  * only at display/aggregation time.
  */
 export const decimalString = z
-  .custom<
-    string | number | { toString: () => string }
-  >((value) => typeof value === "string" || typeof value === "number" || isDecimalLike(value), { message: "Expected a decimal value" })
+  .custom<string | number | { toString: () => string }>(
+    (value) => typeof value === "string" || typeof value === "number" || isDecimalLike(value),
+    { message: "Expected a decimal value" },
+  )
   .transform((value) => String(value));
 
 /**

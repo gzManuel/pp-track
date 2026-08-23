@@ -65,7 +65,7 @@ describe("server-api", () => {
       vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response('{"ok":true}')));
       vi.stubGlobal("crypto", {
         randomUUID: () => "test-uuid-1234",
-      } as unknown as Crypto);
+      });
     });
 
     it("should construct full URL from path", async () => {
