@@ -1,15 +1,19 @@
 name: Deploy server to Droplet
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - "apps/server/**"
-      # Shared packages and the task graph affect the server build too.
-      - "packages/**"
-      - "turbo.json"
-      - "pnpm-lock.yaml"
-      - ".github/workflows/deploy-server.yml"
+  # DISABLED: no droplet is provisioned yet, so automatic deploys on merge to
+  # main would fail on every push. Uncomment this block once DROPLET_HOST,
+  # DROPLET_USER, and DROPLET_SSH_KEY are set in repo secrets and the host is
+  # bootstrapped (/home/deploy/pp-track cloned, pnpm + pm2 installed).
+  # push:
+  #   branches: [main]
+  #   paths:
+  #     - "apps/server/**"
+  #     # Shared packages and the task graph affect the server build too.
+  #     - "packages/**"
+  #     - "turbo.json"
+  #     - "pnpm-lock.yaml"
+  #     - ".github/workflows/deploy-server.yml"
   workflow_dispatch: {}
 
 concurrency:
