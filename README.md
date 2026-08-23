@@ -10,6 +10,7 @@ A portfolio tracking application. Track investments across multiple portfolios, 
 - Live and historical asset prices via [yahoo-finance2](https://github.com/gadicc/node-yahoo-finance2), with dólar MEP and CCL rates from [dolarapi](https://dolarapi.com) and [ArgentinaDatos](https://argentinadatos.com)
 - Charts powered by Recharts
 - OAuth sign-in (Google, Facebook) via NextAuth
+- A one-click toggle that hides every amount and share count, for using the app in public
 
 ### Currencies
 
@@ -18,6 +19,12 @@ Trades are recorded in one of three currencies — **ARS** (pesos), **MEP** (dol
 Each holding therefore carries a cost basis in all three currencies: the amount really paid in each, rather than a single figure revalued at today's rate. The dashboard switches between them, so the ARS view shows real peso performance instead of one distorted by exchange-rate moves since purchase.
 
 A CEDEAR is a single asset no matter which of its BYMA symbols you trade — `SPY.BA` (pesos), `SPYD.BA` (MEP) and `SPYC.BA` (CCL) all resolve to one position.
+
+### Hiding your balances
+
+The eye button in the header masks every monetary amount and share count across the dashboard, portfolios and transactions pages. Tickers, dates and percentages stay visible, so the pages remain navigable — you can still see _what_ you hold, just not what it is worth.
+
+The choice is kept in a cookie rather than in the browser's local storage. Every page is server-rendered, so the amounts arrive already masked in the first byte of HTML; local storage would paint the real numbers and only blank them once the page finished loading.
 
 ## Tech stack
 
@@ -79,9 +86,13 @@ pnpm build                        # build all apps
 pnpm lint                         # lint all packages
 pnpm check-types                  # type-check all packages
 pnpm test                         # run all test suites
+pnpm test:coverage                # run all test suites with coverage thresholds enforced
 pnpm format                       # prettier-format all TS/TSX/MD files
+pnpm format:check                 # verify formatting without writing (what CI runs)
 pnpm migrate                      # run Prisma migrations against the dev database
 ```
+
+CI gates on `lint`, `check-types`, `test:coverage`, `format:check` and `build`, so running those five locally is the quickest way to know a change will pass.
 
 ## Data model
 
