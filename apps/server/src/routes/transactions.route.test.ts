@@ -3,6 +3,7 @@ import type { FastifyInstance } from "fastify";
 import { buildApp } from "../app.js";
 import { asPrismaClient, createStubPrisma, dec, type StubPrisma } from "../test-support/stub-prisma.js";
 import {
+  ASSET_ID,
   auth,
   assetRow,
   OTHER_PORTFOLIO_ID,
@@ -356,6 +357,123 @@ describe("transaction routes", () => {
       expect(res.statusCode).toBe(404);
       expect(res.json<ErrorBody>()).toEqual({ error: "Target portfolio not found" });
       expect(prisma.transaction.update).not.toHaveBeenCalled();
+    });
+
+    // The edit path is remove-then-reapply: the pre-edit holding is rebuilt
+    // without this transaction, the row is updated, then the target holding is
+    // replayed in full. These cover that whole block inside the $transaction.
+    describe("a successful edit", () => {
+      beforeEach(() => {
+        prisma.portfolio.findFirst.mockResolvedValue(portfolioRow);
+        prisma.transaction.findFirst.mockResolvedValue(transactionRow());
+        prisma.asset.findFirst.mockResolvedValue(assetRow);
+        prisma.transaction.findMany.mockResolvedValue([transactionRow()]);
+        prisma.holding.findUnique.mockResolvedValue(null);
+        prisma.holding.create.mockResolvedValue({});
+      });
+
+      it("should persist the edited values and return the updated transaction", async () => {
+        prisma.transaction.update.mockResolvedValue(transactionRow({ quantity: dec("25"), price: dec("150") }));
+
+        const res = await app.inject({
+          method: "PATCH",
+          url: `/api/portfolios/${PORTFOLIO_ID}/transactions/${TX_ID}`,
+          headers: auth,
+          payload: { ...validTransactionBody, quantity: 25, price: 150 },
+        });
+
+        expect(res.statusCode).toBe(200);
+        const [updateArgs] = prisma.transaction.update.mock.calls[0] as [{ where: { id: string }; data: Record<string, unknown> }];
+        expect(updateArgs.where).toEqual({ id: TX_ID });
+        expect(updateArgs.data).toMatchObject({ portfolioId: PORTFOLIO_ID, assetId: ASSET_ID, type: "BUY", quantity: 25, price: 150 });
+      });
+
+      // An edit can move the trade to a different date, so the stored rates must
+      // match the date actually persisted rather than the pre-edit ones.
+      it("should re-snapshot the FX rates for the edited date", async () => {
+        prisma.transaction.update.mockResolvedValue(transactionRow());
+
+        await app.inject({
+          method: "PATCH",
+          url: `/api/portfolios/${PORTFOLIO_ID}/transactions/${TX_ID}`,
+          headers: auth,
+          payload: { ...validTransactionBody, transactedAt: "2026-02-20" },
+        });
+
+        const [updateArgs] = prisma.transaction.update.mock.calls[0] as [{ data: { mepRate: number; cclRate: number } }];
+        expect(updateArgs.data.mepRate).toBe(TEST_MEP);
+        expect(updateArgs.data.cclRate).toBe(TEST_CCL);
+      });
+
+      it("should reassign the transaction when the move target is the caller's", async () => {
+        prisma.transaction.update.mockResolvedValue(transactionRow({ portfolioId: OTHER_PORTFOLIO_ID }));
+
+        const res = await app.inject({
+          method: "PATCH",
+          url: `/api/portfolios/${PORTFOLIO_ID}/transactions/${TX_ID}`,
+          headers: auth,
+          payload: { ...validTransactionBody, portfolioId: OTHER_PORTFOLIO_ID },
+        });
+
+        expect(res.statusCode).toBe(200);
+        const [updateArgs] = prisma.transaction.update.mock.calls[0] as [{ data: { portfolioId: string } }];
+        expect(updateArgs.data.portfolioId).toBe(OTHER_PORTFOLIO_ID);
+      });
+
+      it("should rebuild the target holding for a SELL", async () => {
+        prisma.transaction.update.mockResolvedValue(transactionRow({ type: "SELL", quantity: dec("2") }));
+        prisma.transaction.findMany.mockResolvedValue([
+          transactionRow(),
+          transactionRow({ id: "other", type: "SELL", quantity: dec("2") }),
+        ]);
+
+        const res = await app.inject({
+          method: "PATCH",
+          url: `/api/portfolios/${PORTFOLIO_ID}/transactions/${TX_ID}`,
+          headers: auth,
+          payload: { ...validTransactionBody, type: "SELL", quantity: 2 },
+        });
+
+        expect(res.statusCode).toBe(200);
+        expect(prisma.holding.create).toHaveBeenCalled();
+      });
+
+      // Dividends and fees don't move the position, so only the pre-edit rebuild runs.
+      it("should skip the target rebuild when the edited type is a DIVIDEND", async () => {
+        prisma.transaction.update.mockResolvedValue(transactionRow({ type: "DIVIDEND" }));
+
+        const res = await app.inject({
+          method: "PATCH",
+          url: `/api/portfolios/${PORTFOLIO_ID}/transactions/${TX_ID}`,
+          headers: auth,
+          payload: { ...validTransactionBody, type: "DIVIDEND" },
+        });
+
+        expect(res.statusCode).toBe(200);
+        // One replay only: the pre-edit holding. The target is left alone.
+        expect(prisma.transaction.findMany).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    it("should return 422 when the edit oversells the position at that date", async () => {
+      prisma.portfolio.findFirst.mockResolvedValue(portfolioRow);
+      prisma.transaction.findFirst.mockResolvedValue(transactionRow());
+      prisma.asset.findFirst.mockResolvedValue(assetRow);
+      const sell = transactionRow({ type: "SELL", quantity: dec("999") });
+      prisma.transaction.update.mockResolvedValue(sell);
+      // Nothing was ever bought, so the edited SELL overdraws the position.
+      prisma.transaction.findMany.mockResolvedValue([sell]);
+      prisma.holding.findUnique.mockResolvedValue(null);
+
+      const res = await app.inject({
+        method: "PATCH",
+        url: `/api/portfolios/${PORTFOLIO_ID}/transactions/${TX_ID}`,
+        headers: auth,
+        payload: { ...validTransactionBody, type: "SELL", quantity: 999 },
+      });
+
+      expect(res.statusCode).toBe(422);
+      expect(res.json<ErrorBody>()).toEqual({ error: "Cannot sell more than the quantity held at that date" });
     });
   });
 

@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { FastifyInstance } from "fastify";
+import { Prisma } from "@prisma/client";
 import { buildApp } from "../app.js";
 import { asPrismaClient, createStubPrisma, dec, type StubPrisma } from "../test-support/stub-prisma.js";
 import {
@@ -94,6 +95,41 @@ describe("portfolio routes", () => {
 
       expect(res.statusCode).toBe(400);
       expect(res.json<ErrorBody>().error).toBe("Validation failed");
+      expect(prisma.portfolio.create).not.toHaveBeenCalled();
+    });
+
+    // count + create run at Serializable isolation so two concurrent "first
+    // portfolio" requests can't both win the default flag. The loser aborts with
+    // P2034 and must be retried, not surfaced to the caller.
+    it("should retry once when the serializable transaction aborts", async () => {
+      const abort = new Prisma.PrismaClientKnownRequestError("Transaction failed due to a write conflict", {
+        code: "P2034",
+        clientVersion: "7.0.0",
+      });
+      prisma.portfolio.count.mockRejectedValueOnce(abort).mockResolvedValue(1);
+      prisma.portfolio.create.mockResolvedValue({ ...portfolioRow, isDefault: false });
+
+      const res = await app.inject({ method: "POST", url: "/api/portfolios", headers: auth, payload: { name: "Main" } });
+
+      expect(res.statusCode).toBe(201);
+      expect(prisma.portfolio.count).toHaveBeenCalledTimes(2);
+      // The rerun sees the winner's row, so this one is no longer the default.
+      expect(prisma.portfolio.create).toHaveBeenCalledWith({
+        data: { userId: USER_ID, name: "Main", isDefault: false },
+      });
+    });
+
+    it("should not retry an error that is not a write conflict", async () => {
+      const other = new Prisma.PrismaClientKnownRequestError("Timed out fetching a connection", {
+        code: "P2024",
+        clientVersion: "7.0.0",
+      });
+      prisma.portfolio.count.mockRejectedValue(other);
+
+      const res = await app.inject({ method: "POST", url: "/api/portfolios", headers: auth, payload: { name: "Main" } });
+
+      expect(res.statusCode).toBe(500);
+      expect(prisma.portfolio.count).toHaveBeenCalledTimes(1);
       expect(prisma.portfolio.create).not.toHaveBeenCalled();
     });
   });
