@@ -15,6 +15,11 @@ jobs:
   # This repo has leaked a secret before — scan every push/PR for new ones.
   secrets-scan:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # gitleaks-action reads the PR's commit list and writes findings back as
+      # PR comments; without this the API call 403s.
+      pull-requests: write
     steps:
       - uses: actions/checkout@v4
         with:
