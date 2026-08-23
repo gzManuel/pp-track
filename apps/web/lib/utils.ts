@@ -12,3 +12,12 @@ export function formatMoney(value: number, decimals = 2) {
     maximumFractionDigits: decimals,
   });
 }
+
+// Shares: whole numbers for stocks/ETFs, but crypto positions are fractional
+// (e.g. 0.05 BTC), so show up to 8 decimals and trim trailing zeros.
+export function formatShares(value: number) {
+  return value.toLocaleString("en-US", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 8,
+  });
+}

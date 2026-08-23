@@ -5,6 +5,7 @@ import { currencySymbol, displayTicker, transactionPriceIn } from "@/lib/currenc
 import { Badge } from "@/components/shadcn/Badge";
 import { Card, CardContent } from "@/components/shadcn/Card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/shadcn/Table";
+import Money from "../Money";
 import DeleteTransactionButton from "./DeleteTransactionButton";
 import EditTransactionDialog from "./EditTransactionDialog";
 
@@ -112,11 +113,13 @@ export default function TransactionsTable({
                     </CardRow>
                   )}
                   <CardRow label="Quantity">{Number(tx.quantity).toFixed(4)}</CardRow>
-                  <CardRow label={`Price (${tx.currency})`}>{Number(tx.price).toFixed(2)}</CardRow>
-                  <CardRow label="Fee">{Number(tx.fee) > 0 ? Number(tx.fee).toFixed(2) : "—"}</CardRow>
+                  <CardRow label={`Price (${tx.currency})`}>
+                    <Money value={Number(tx.price)} />
+                  </CardRow>
+                  <CardRow label="Fee">{Number(tx.fee) > 0 ? <Money value={Number(tx.fee)} /> : "—"}</CardRow>
                   <CardRow label="Total">
                     <span className="font-medium">
-                      {total.toFixed(2)} <span className="text-muted-foreground">{totalLabel}</span>
+                      <Money value={total} /> <span className="text-muted-foreground">{totalLabel}</span>
                     </span>
                   </CardRow>
                   {/* Length check (not `?? "—"`) so empty-string notes also fall back to the dash. */}
@@ -175,13 +178,15 @@ export default function TransactionsTable({
                     <Badge variant={tx.type === "BUY" ? "default" : "secondary"}>{tx.type}</Badge>
                   </TableCell>
                   <TableCell className="text-right font-mono">{Number(tx.quantity).toFixed(4)}</TableCell>
-                  <TableCell className="text-right font-mono">{Number(tx.price).toFixed(2)}</TableCell>
+                  <TableCell className="text-right font-mono">
+                    <Money value={Number(tx.price)} />
+                  </TableCell>
                   <TableCell>{tx.currency}</TableCell>
                   <TableCell className="text-right font-mono text-muted-foreground">
-                    {Number(tx.fee) > 0 ? Number(tx.fee).toFixed(2) : "—"}
+                    {Number(tx.fee) > 0 ? <Money value={Number(tx.fee)} /> : "—"}
                   </TableCell>
                   <TableCell className="text-right font-mono font-medium">
-                    {total.toFixed(2)} <span className="text-muted-foreground">{totalLabel}</span>
+                    <Money value={total} /> <span className="text-muted-foreground">{totalLabel}</span>
                   </TableCell>
                   {/* Length check (not `?? "—"`) so empty-string notes also fall back to the dash. */}
                   <TableCell className="max-w-xs truncate text-sm text-muted-foreground">{tx.notes?.length ? tx.notes : "—"}</TableCell>

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { cn, formatMoney } from "./utils";
+import { cn, formatMoney, formatShares } from "./utils";
 
 describe("utils", () => {
   describe("cn", () => {
@@ -95,5 +95,32 @@ describe("utils", () => {
     it("should handle scientific notation input", () => {
       expect(formatMoney(1e3)).toBe("1,000.00");
     });
+  });
+});
+
+describe("formatShares", () => {
+  it("should render a whole share count with no decimals", () => {
+    expect(formatShares(10)).toBe("10");
+  });
+
+  it("should group thousands", () => {
+    expect(formatShares(12345)).toBe("12,345");
+  });
+
+  // Crypto positions are fractional, so the decimals have to survive.
+  it("should keep up to eight decimals for a fractional position", () => {
+    expect(formatShares(0.05123456)).toBe("0.05123456");
+  });
+
+  it("should trim trailing zeros rather than padding", () => {
+    expect(formatShares(1.5)).toBe("1.5");
+  });
+
+  it("should round beyond eight decimals", () => {
+    expect(formatShares(0.123456789)).toBe("0.12345679");
+  });
+
+  it("should format zero", () => {
+    expect(formatShares(0)).toBe("0");
   });
 });

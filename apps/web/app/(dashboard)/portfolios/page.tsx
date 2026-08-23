@@ -5,6 +5,7 @@ import { fetchHoldings, fetchPriceData, summarizeHoldings } from "@/lib/holdings
 import { currencySymbol, parseDisplayCurrency } from "@/lib/currency";
 import { formatMoney } from "@/lib/utils";
 import type { Portfolio } from "@/lib/types";
+import Money from "../_components/Money";
 import CreatePortfolioDialog from "../_components/portfolio/CreatePortfolioDialog";
 
 export default async function PortfoliosPage({ searchParams }: { searchParams: Promise<{ currency?: string }> }) {
@@ -57,20 +58,19 @@ export default async function PortfoliosPage({ searchParams }: { searchParams: P
                   <div className="flex items-center justify-between">
                     <dt className="text-muted-foreground">Total Invested</dt>
                     <dd className="font-mono">
-                      {currencySymbol(view)} {formatMoney(summary.totalInvested)}
+                      {currencySymbol(view)} <Money value={summary.totalInvested} />
                     </dd>
                   </div>
                   <div className="flex items-center justify-between">
                     <dt className="text-muted-foreground">Market Value</dt>
                     <dd className="font-mono">
-                      {currencySymbol(view)} {formatMoney(summary.totalMarketValue)}
+                      {currencySymbol(view)} <Money value={summary.totalMarketValue} />
                     </dd>
                   </div>
                   <div className="flex items-center justify-between">
                     <dt className="text-muted-foreground">Gain/Loss</dt>
                     <dd className={`font-mono ${positive ? "text-emerald-600" : "text-red-500"}`}>
-                      {positive ? "+" : ""}
-                      {formatMoney(summary.gain)}
+                      <Money value={summary.gain} signed />
                       {summary.gainPct !== null && (
                         <span className="ml-1 text-xs">
                           ({positive ? "+" : ""}
