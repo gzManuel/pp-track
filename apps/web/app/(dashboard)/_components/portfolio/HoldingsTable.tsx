@@ -5,15 +5,8 @@ import { Card, CardContent } from "@/components/shadcn/Card";
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/shadcn/Table";
 import type { EnrichedHolding } from "@/lib/types";
 import { formatMoney as fmt } from "@/lib/utils";
-
-// Shares: whole numbers for stocks/ETFs, but crypto positions are fractional
-// (e.g. 0.05 BTC), so show up to 8 decimals and trim trailing zeros.
-function fmtShares(value: number) {
-  return value.toLocaleString("en-US", {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 8,
-  });
-}
+import Money from "../Money";
+import Shares from "../Shares";
 
 function gainColor(value: number) {
   return value >= 0 ? "text-emerald-600" : "text-red-500";
@@ -24,8 +17,7 @@ function GainValue({ value, pct }: { value: number; pct?: number | null }) {
   const sign = value >= 0 ? "+" : "";
   return (
     <>
-      {sign}
-      {fmt(value)}
+      <Money value={value} signed />
       {pct !== undefined && pct !== null && (
         <span className="ml-1 text-xs opacity-75">
           ({sign}
@@ -90,13 +82,17 @@ export default function HoldingsTable({ holdings, priceCurrency = "USD" }: { hol
                   )}
                 </div>
                 <dl className="flex flex-col gap-1.5">
-                  <CardRow label="Shares">{fmtShares(h.shares)}</CardRow>
-                  <CardRow label="Avg cost">{fmt(h.avgCost, 4)}</CardRow>
+                  <CardRow label="Shares">
+                    <Shares value={h.shares} />
+                  </CardRow>
+                  <CardRow label="Avg cost">
+                    <Money value={h.avgCost} decimals={4} />
+                  </CardRow>
                   <CardRow label={`Current price (${priceCurrency})`}>
-                    {h.currentPrice !== null ? fmt(h.currentPrice) : <span className="text-muted-foreground">—</span>}
+                    {h.currentPrice !== null ? <Money value={h.currentPrice} /> : <span className="text-muted-foreground">—</span>}
                   </CardRow>
                   <CardRow label={`Market value (${priceCurrency})`}>
-                    {h.marketValue !== null ? fmt(h.marketValue) : <span className="text-muted-foreground">—</span>}
+                    {h.marketValue !== null ? <Money value={h.marketValue} /> : <span className="text-muted-foreground">—</span>}
                   </CardRow>
                   <CardRow label="Gain / loss">
                     {h.gain !== null ? (
@@ -117,7 +113,9 @@ export default function HoldingsTable({ holdings, priceCurrency = "USD" }: { hol
           <CardContent className="flex flex-col gap-1.5">
             <div className="flex items-baseline justify-between gap-3">
               <span className="text-xs font-semibold">Total market value</span>
-              <span className="font-mono text-sm font-semibold">{fmt(totalMarketValue)}</span>
+              <span className="font-mono text-sm font-semibold">
+                <Money value={totalMarketValue} />
+              </span>
             </div>
             <div className="flex items-baseline justify-between gap-3">
               <span className="text-xs font-semibold">Total gain / loss</span>
@@ -152,13 +150,17 @@ export default function HoldingsTable({ holdings, priceCurrency = "USD" }: { hol
                   {displayTicker(h.ticker).isCedear && <span className="ml-1.5 text-[10px] font-sans text-muted-foreground">CEDEAR</span>}
                 </TableCell>
                 <TableCell className="text-sm text-muted-foreground">{h.name}</TableCell>
-                <TableCell className="text-right font-mono">{fmtShares(h.shares)}</TableCell>
-                <TableCell className="text-right font-mono">{fmt(h.avgCost, 4)}</TableCell>
                 <TableCell className="text-right font-mono">
-                  {h.currentPrice !== null ? fmt(h.currentPrice) : <span className="text-muted-foreground">—</span>}
+                  <Shares value={h.shares} />
                 </TableCell>
                 <TableCell className="text-right font-mono">
-                  {h.marketValue !== null ? fmt(h.marketValue) : <span className="text-muted-foreground">—</span>}
+                  <Money value={h.avgCost} decimals={4} />
+                </TableCell>
+                <TableCell className="text-right font-mono">
+                  {h.currentPrice !== null ? <Money value={h.currentPrice} /> : <span className="text-muted-foreground">—</span>}
+                </TableCell>
+                <TableCell className="text-right font-mono">
+                  {h.marketValue !== null ? <Money value={h.marketValue} /> : <span className="text-muted-foreground">—</span>}
                 </TableCell>
                 <GainCell value={h.gain} pct={h.gainPct} />
                 <TableCell className="text-right font-mono text-muted-foreground">
@@ -172,10 +174,11 @@ export default function HoldingsTable({ holdings, priceCurrency = "USD" }: { hol
               <TableCell colSpan={5} className="font-semibold">
                 Total
               </TableCell>
-              <TableCell className="text-right font-mono font-semibold">{fmt(totalMarketValue)}</TableCell>
+              <TableCell className="text-right font-mono font-semibold">
+                <Money value={totalMarketValue} />
+              </TableCell>
               <TableCell className={`text-right font-mono font-semibold ${totalGainColor}`}>
-                {totalGainSign}
-                {fmt(totalGain)}
+                <Money value={totalGain} signed />
                 {totalGainPct !== null && (
                   <span className="ml-1 text-xs opacity-75">
                     ({totalGainSign}

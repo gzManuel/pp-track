@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/shadcn/Ca
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/shadcn/Chart";
 import type { EnrichedHolding } from "@/lib/types";
 import { formatMoney as fmt } from "@/lib/utils";
+import { useMoneyFormat } from "@/lib/money-visibility";
 import { BASE_PALETTE, tickerColorMap } from "./chartColors";
 
 const GAIN_COLOR = "#059669"; // emerald-600
@@ -26,6 +27,7 @@ const chartConfig = {
 } satisfies ChartConfig;
 
 export default function GainLossChart({ holdings, priceCurrency }: { holdings: EnrichedHolding[]; priceCurrency: string }) {
+  const money = useMoneyFormat();
   const colors = tickerColorMap(
     holdings.map((h) => h.ticker),
     BASE_PALETTE,
@@ -64,7 +66,7 @@ export default function GainLossChart({ holdings, priceCurrency }: { holdings: E
               {/* Drop intermediate ticker labels rather than letting them
                   overlap once the plot area narrows. */}
               <XAxis dataKey="ticker" tickLine={false} axisLine={false} tickMargin={8} interval="preserveStartEnd" minTickGap={4} />
-              <YAxis tickLine={false} axisLine={false} width={56} />
+              <YAxis tickLine={false} axisLine={false} width={56} tickFormatter={(value: number) => money(value, 0)} />
               <ChartTooltip
                 content={
                   <ChartTooltipContent
@@ -72,11 +74,11 @@ export default function GainLossChart({ holdings, priceCurrency }: { holdings: E
                       const d = item.payload as ChartDatum | undefined;
                       if (!d) return null;
                       if (name === "base") {
-                        return `Cost: ${fmt(d.cost)} ${priceCurrency}`;
+                        return `Cost: ${money(d.cost)} ${priceCurrency}`;
                       }
                       const sign = d.gain >= 0 ? "+" : "";
                       const pct = d.gainPct != null ? ` (${sign}${fmt(d.gainPct, 1)}%)` : "";
-                      return `Gain / Loss: ${sign}${fmt(d.gain)} ${priceCurrency}${pct}`;
+                      return `Gain / Loss: ${sign}${money(d.gain)} ${priceCurrency}${pct}`;
                     }}
                   />
                 }

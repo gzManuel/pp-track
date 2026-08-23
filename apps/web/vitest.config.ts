@@ -4,6 +4,9 @@ import path from "node:path";
 
 export default defineConfig({
   plugins: [react()],
+  // tsconfig.json must keep `jsx: "preserve"` for Next's own compiler, which
+  // leaves JSX untransformed for Vite. Component tests need it compiled.
+  oxc: { jsx: { runtime: "automatic" } },
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "."),

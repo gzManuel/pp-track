@@ -12,6 +12,7 @@ import {
 } from "@/components/shadcn/Chart";
 import type { EnrichedHolding } from "@/lib/types";
 import { formatMoney as fmt } from "@/lib/utils";
+import { useMoneyFormat } from "@/lib/money-visibility";
 import { tickerColorMap } from "./chartColors";
 
 const RADIAN = Math.PI / 180;
@@ -45,6 +46,7 @@ function renderSliceLabel({
 }
 
 export default function AllocationChart({ holdings, priceCurrency }: { holdings: EnrichedHolding[]; priceCurrency: string }) {
+  const money = useMoneyFormat();
   const colors = tickerColorMap(holdings.map((h) => h.ticker));
   const data = holdings
     .filter((h): h is EnrichedHolding & { marketValue: number } => h.marketValue !== null)
@@ -77,7 +79,7 @@ export default function AllocationChart({ holdings, priceCurrency }: { holdings:
                     formatter={(value, name, item) => {
                       const pct = (item.payload as { pct?: number | null }).pct;
                       const pctStr = pct != null ? ` (${fmt(pct, 1)}%)` : "";
-                      return `${String(name)}: ${fmt(Number(value))} ${priceCurrency}${pctStr}`;
+                      return `${String(name)}: ${money(Number(value))} ${priceCurrency}${pctStr}`;
                     }}
                   />
                 }
